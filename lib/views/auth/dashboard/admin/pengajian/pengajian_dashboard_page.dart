@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_search_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_selector.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_page.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -36,7 +37,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   @override
   void initState() {
     super.initState();
-    // Initialize _selectedOrgId. If it's a Super Admin and orgId is empty, 
+    // Initialize _selectedOrgId. If it's a Super Admin and orgId is empty,
     // keep it null to avoid Dropdown assertion errors.
     if (widget.user.adminLevel == 0 && widget.orgId.isEmpty) {
       _selectedOrgId = null;
@@ -58,7 +59,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       setState(() {
         _daerahList = List<Map<String, dynamic>>.from(response);
         // Automatically select the first daerah if none is selected
-        if (_daerahList.isNotEmpty && (_selectedOrgId == null || _selectedOrgId!.isEmpty)) {
+        if (_daerahList.isNotEmpty &&
+            (_selectedOrgId == null || _selectedOrgId!.isEmpty)) {
           _selectedOrgId = _daerahList.first['id'];
         }
         _isFetchingDaerah = false;
@@ -69,18 +71,43 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     }
   }
 
-  void _openScanner(Pengajian pengajian) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BarcodeScannerPage(
-          pengajian: pengajian,
-          onResult: (username) async {
-            await _handleScanResult(pengajian, username);
-          },
+  void _openScanner(Pengajian pengajian) async {
+    final status = await Permission.camera.request();
+
+    if (status.isGranted) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BarcodeScannerPage(
+            pengajian: pengajian,
+            onResult: (username) async {
+              await _handleScanResult(pengajian, username);
+            },
+          ),
         ),
-      ),
-    );
+      );
+    } else if (status.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              "Izin kamera ditolak permanen. Buka pengaturan?",
+            ),
+            action: SnackBarAction(
+              label: "Buka",
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
+      }
+    } else {
+      if (mounted)
+        _showStatusSnackBar(
+          "Izin kamera diperlukan untuk scan.",
+          isError: true,
+        );
+    }
   }
 
   Future<void> _handleScanResult(Pengajian pengajian, String username) async {
@@ -594,7 +621,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
             const LinearProgressIndicator()
           else
             DropdownButtonFormField<String>(
-              value: (_selectedOrgId != null && _selectedOrgId!.isNotEmpty) ? _selectedOrgId : null,
+              value: (_selectedOrgId != null && _selectedOrgId!.isNotEmpty)
+                  ? _selectedOrgId
+                  : null,
               isExpanded: true,
               hint: const Text("Pilih Daerah"),
               decoration: InputDecoration(

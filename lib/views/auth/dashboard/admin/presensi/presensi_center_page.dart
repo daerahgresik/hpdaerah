@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/presensi/daftar_hadir_page.dart';
 
 class PresensiCenterPage extends StatefulWidget {
   const PresensiCenterPage({super.key});
@@ -62,7 +63,7 @@ class _PresensiCenterPageState extends State<PresensiCenterPage>
           children: [
             _buildPlaceholder('Halaman Approve Manual'),
             _buildPlaceholder('Halaman Kelola Izin'),
-            _buildPlaceholder('Halaman Rekap Presensi'),
+            const DaftarHadirPage(), // New Page
           ],
         ),
       ),

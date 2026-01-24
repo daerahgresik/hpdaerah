@@ -4,6 +4,7 @@ import 'package:hpdaerah/models/presensi_model.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class PengajianDetailPage extends StatefulWidget {
   final Pengajian pengajian;
@@ -18,18 +19,39 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
   final _presensiService = PresensiService();
   bool _isScanning = false;
 
-  void _openScanner() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BarcodeScannerPage(
-          pengajian: widget.pengajian,
-          onResult: (username) async {
-            await _handleScanResult(username);
-          },
+  void _openScanner() async {
+    final status = await Permission.camera.request();
+
+    if (status.isGranted) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BarcodeScannerPage(
+            pengajian: widget.pengajian,
+            onResult: (username) async {
+              await _handleScanResult(username);
+            },
+          ),
         ),
-      ),
-    );
+      );
+    } else if (status.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              "Izin kamera ditolak permanen. Buka pengaturan?",
+            ),
+            action: SnackBarAction(
+              label: "Buka",
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
+      }
+    } else {
+      _showErrorSnackBar("Izin kamera diperlukan untuk scan.");
+    }
   }
 
   Future<void> _handleScanResult(String username) async {
