@@ -1,18 +1,10 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/((?!build/web).*)",
-      "destination": "/build/web/$1"
-    }
-  ],
   "routes": [
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/.*",
-      "dest": "/build/web/index.html"
+      "src": "/[^.]+",
+      "dest": "/",
+      "status": 200
     }
   ]
 }
