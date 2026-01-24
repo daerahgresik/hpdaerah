@@ -1,0 +1,125 @@
+import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hpdaerah/models/user_model.dart';
+import 'package:hpdaerah/models/organization_model.dart';
+import 'package:hpdaerah/services/organization_service.dart';
+
+class RegisterController {
+  final SupabaseClient _client = Supabase.instance.client;
+  final OrganizationService _organizationService = OrganizationService();
+
+  // --- HIERARCHY DATA FETCHING ---
+
+  Future<List<Organization>> fetchDaerah() {
+    return _organizationService.fetchDaerah();
+  }
+
+  Future<List<Organization>> fetchChildren(String parentId) {
+    return _organizationService.fetchChildren(parentId);
+  }
+
+  // --- ADMIN CONTACT FETCHING ---
+  Future<List<UserModel>> fetchAdminsByOrgId(String orgId) async {
+    try {
+      final response = await _client
+          .from('users')
+          .select()
+          .eq('admin_org_id', orgId)
+          .eq('is_admin', true); // Hanya ambil admin
+
+      final List<dynamic> data = response;
+      return data.map((json) => UserModel.fromJson(json)).toList();
+    } catch (e) {
+      // Return empty list if error (fail gracefully)
+      return [];
+    }
+  }
+
+  // --- REGISTRATION LOGIC ---
+
+  Future<void> registerUser({
+    required String nama,
+    required String username,
+    required String password,
+    required String? asal,
+    required String? statusWarga,
+    required String? keperluan,
+    required String? detailKeperluan,
+    File? fotoProfilFile,
+    required String? selectedDaerah,
+    required String? selectedDesa,
+    required String? selectedKelompok,
+    required String? selectedKelas,
+    required String? noWa, // New Parameter
+  }) async {
+    try {
+      // 1. Determine Organization ID
+      final determinedOrgId =
+          selectedKelas ?? selectedKelompok ?? selectedDesa ?? selectedDaerah;
+
+      // 2. Upload Photo if exists
+      String? fotoUrl;
+      if (fotoProfilFile != null) {
+        fotoUrl = await _uploadAvatar(fotoProfilFile);
+      }
+
+      // 3. Create User Model
+      final userModel = UserModel(
+        username: username,
+        nama: nama,
+        password: password,
+        asal: asal,
+        statusWarga: statusWarga,
+        keperluan: keperluan,
+        detailKeperluan: detailKeperluan,
+        jabatan: null,
+        keterangan: null,
+        fotoProfil: fotoUrl,
+        currentOrgId: determinedOrgId,
+        noWa: noWa, // Add noWa
+      );
+
+      // 4. Insert into 'users' table
+      final response = await _client
+          .from('users')
+          .insert(userModel.toJson())
+          .select()
+          .single();
+
+      final userId = response['id'];
+
+      // 5. Insert into 'user_organizations' (Link to Kelas/Level 3)
+      if (selectedKelas != null) {
+        await _client.from('user_organizations').insert({
+          'user_id': userId,
+          'org_id': selectedKelas,
+          'role': 'member',
+        });
+      }
+    } catch (e) {
+      throw 'Registrasi gagal: $e';
+    }
+  }
+
+  Future<String> _uploadAvatar(File imageFile) async {
+    try {
+      final fileExt = imageFile.path.split('.').last;
+      final fileName =
+          'avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = fileName;
+
+      await _client.storage
+          .from('avatars')
+          .upload(
+            filePath,
+            imageFile,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+          );
+
+      return _client.storage.from('avatars').getPublicUrl(filePath);
+    } catch (e) {
+      // If error, return null or throw. For now we throw.
+      throw 'Gagal upload foto: $e';
+    }
+  }
+}
