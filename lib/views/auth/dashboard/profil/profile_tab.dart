@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
-import 'package:hpdaerah/views/auth/login_page.dart'; // Keep if used for navigation (logout etc)
+import 'package:hpdaerah/views/auth/login_page.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:hpdaerah/controllers/profile_controller.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 
 class ProfileTab extends StatefulWidget {
   final UserModel user;
@@ -25,8 +27,6 @@ class _ProfileTabState extends State<ProfileTab> {
     _currentUser = widget.user;
   }
 
-  // --- CRUD FUNCTIONS ---
-
   Future<void> _updateProfile({
     required String nama,
     required String username,
@@ -35,13 +35,12 @@ class _ProfileTabState extends State<ProfileTab> {
     required String keperluan,
     required String detailKeperluan,
     required String keterangan,
-    required String noWa, // New parameter
+    required String noWa,
     String? newPassword,
-    File? newImageFile, // Parameter baru untuk file gambar
+    File? newImageFile,
   }) async {
     setState(() => _isLoading = true);
     try {
-      // Call Controller
       final updatedUser = await _profileController.updateProfile(
         currentUser: _currentUser,
         nama: nama,
@@ -51,12 +50,11 @@ class _ProfileTabState extends State<ProfileTab> {
         keperluan: keperluan,
         detailKeperluan: detailKeperluan,
         keterangan: keterangan,
-        noWa: noWa, // Pass to controller
+        noWa: noWa,
         newPassword: newPassword,
         newImageFile: newImageFile,
       );
 
-      // Update Local State with result from Controller
       setState(() {
         _currentUser = updatedUser;
       });
@@ -68,15 +66,12 @@ class _ProfileTabState extends State<ProfileTab> {
             backgroundColor: Color(0xFF1A5F2D),
           ),
         );
-        Navigator.pop(context); // Close modal
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()), // Show error from controller
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -84,13 +79,12 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
-  // --- HELPER PICK IMAGE ---
   Future<File?> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
       source: source,
-      imageQuality: 70, // Kompresi ringan
-      maxWidth: 800, // Batasi ukuran lebar
+      imageQuality: 70,
+      maxWidth: 800,
     );
 
     if (pickedFile != null) {
@@ -100,15 +94,10 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   void _showEditFullProfileDialog() {
-    // 1. Inisialisasi controller
     final namaCtrl = TextEditingController(text: _currentUser.nama);
     final usernameCtrl = TextEditingController(text: _currentUser.username);
-    final noWaCtrl = TextEditingController(
-      text: _currentUser.noWa ?? '',
-    ); // Init WA
+    final noWaCtrl = TextEditingController(text: _currentUser.noWa ?? '');
     final passwordCtrl = TextEditingController();
-
-    // Perantau fields
     final asalCtrl = TextEditingController(text: _currentUser.asal ?? '');
     final detailKeperluanCtrl = TextEditingController(
       text: _currentUser.detailKeperluan ?? '',
@@ -117,13 +106,11 @@ class _ProfileTabState extends State<ProfileTab> {
       text: _currentUser.keterangan ?? '',
     );
 
-    // State Variables untuk Modal
     String? selectedStatus = _currentUser.statusWarga;
     String? selectedKeperluan = _currentUser.keperluan;
     bool obscurePassword = true;
-    File? selectedImageFile; // State lokal untuk gambar yang baru dipilih
+    File? selectedImageFile;
 
-    // Opsi Dropdown (Sama dengan Register)
     final statusOptions = ['Warga Asli', 'Perantau'];
     final keperluanOptions = ['MT', 'Kuliah', 'Bekerja'];
 
@@ -134,7 +121,7 @@ class _ProfileTabState extends State<ProfileTab> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return Container(
-            height: MediaQuery.of(context).size.height * 0.90, // Lebih tinggi
+            height: MediaQuery.of(context).size.height * 0.90,
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -159,8 +146,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-
-                // --- AVATAR PICKER ---
                 Center(
                   child: Stack(
                     children: [
@@ -199,7 +184,6 @@ class _ProfileTabState extends State<ProfileTab> {
                         right: 0,
                         child: GestureDetector(
                           onTap: () async {
-                            // Show Option: Camera or Gallery
                             showModalBottomSheet(
                               context: context,
                               builder: (ctx) => Column(
@@ -257,11 +241,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
                 Expanded(
                   child: ListView(
                     children: [
-                      // --- DATA UTAMA ---
                       _buildSectionTitle('Info Utama'),
                       _buildTextField(namaCtrl, 'Nama Lengkap', Icons.person),
                       const SizedBox(height: 16),
@@ -270,18 +252,9 @@ class _ProfileTabState extends State<ProfileTab> {
                         'Username',
                         Icons.alternate_email,
                       ),
-                      _buildTextField(
-                        usernameCtrl,
-                        'Username',
-                        Icons.alternate_email,
-                      ),
                       const SizedBox(height: 16),
-
-                      // --- NO WA ---
                       _buildTextField(noWaCtrl, 'No. WhatsApp', Icons.chat),
                       const SizedBox(height: 16),
-
-                      // --- STATUS WARGA (Dropdown) ---
                       _buildSectionTitle('Status Kewarganegaraan'),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -311,7 +284,6 @@ class _ProfileTabState extends State<ProfileTab> {
                             onChanged: (val) {
                               setModalState(() {
                                 selectedStatus = val;
-                                // Reset logic if standard citizen
                                 if (val == 'Warga Asli') {
                                   selectedKeperluan = null;
                                   asalCtrl.clear();
@@ -322,8 +294,6 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ),
                       ),
-
-                      // --- FORM PERANTAU (Conditional) ---
                       if (selectedStatus == 'Perantau') ...[
                         const SizedBox(height: 16),
                         _buildTextField(
@@ -331,7 +301,6 @@ class _ProfileTabState extends State<ProfileTab> {
                           'Asal Daerah (Kota/Kab)',
                           Icons.flight_land,
                         ),
-
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -364,8 +333,6 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                           ),
                         ),
-
-                        // Detail Keperluan (Conditional)
                         if (selectedKeperluan == 'Kuliah' ||
                             selectedKeperluan == 'Bekerja') ...[
                           const SizedBox(height: 16),
@@ -378,7 +345,6 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ],
                       ],
-
                       const SizedBox(height: 24),
                       _buildTextField(
                         keteranganCtrl,
@@ -386,7 +352,6 @@ class _ProfileTabState extends State<ProfileTab> {
                         Icons.note_alt,
                         maxLines: 2,
                       ),
-
                       const SizedBox(height: 24),
                       _buildSectionTitle('Keamanan (Opsional)'),
                       TextField(
@@ -412,12 +377,10 @@ class _ProfileTabState extends State<ProfileTab> {
                           fillColor: Colors.grey[50],
                         ),
                       ),
-
                       const SizedBox(height: 60),
                     ],
                   ),
                 ),
-
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: SizedBox(
@@ -426,7 +389,6 @@ class _ProfileTabState extends State<ProfileTab> {
                       onPressed: _isLoading
                           ? null
                           : () {
-                              // Validasi Sederhana
                               if (selectedStatus == 'Perantau' &&
                                   asalCtrl.text.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -438,7 +400,6 @@ class _ProfileTabState extends State<ProfileTab> {
                                 );
                                 return;
                               }
-                              // Simpan Update
                               _updateProfile(
                                 nama: namaCtrl.text,
                                 username: usernameCtrl.text,
@@ -447,10 +408,9 @@ class _ProfileTabState extends State<ProfileTab> {
                                 keperluan: selectedKeperluan ?? '',
                                 detailKeperluan: detailKeperluanCtrl.text,
                                 keterangan: keteranganCtrl.text,
-                                noWa: noWaCtrl.text, // Send value
+                                noWa: noWaCtrl.text,
                                 newPassword: passwordCtrl.text,
-                                newImageFile:
-                                    selectedImageFile, // Pass gambar baru
+                                newImageFile: selectedImageFile,
                               );
                             },
                       style: ElevatedButton.styleFrom(
@@ -540,8 +500,6 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  // --- UI WIDGETS ---
-
   @override
   Widget build(BuildContext context) {
     const primaryGreen = Color(0xFF1A5F2D);
@@ -550,7 +508,6 @@ class _ProfileTabState extends State<ProfileTab> {
       backgroundColor: const Color(0xFFF3F4F6),
       body: Stack(
         children: [
-          // Header Background
           Container(
             height: 260,
             decoration: const BoxDecoration(
@@ -562,13 +519,11 @@ class _ProfileTabState extends State<ProfileTab> {
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(36)),
             ),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
-                  // App Bar Title
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: const Text(
@@ -580,8 +535,6 @@ class _ProfileTabState extends State<ProfileTab> {
                       ),
                     ),
                   ),
-
-                  // Main Profile Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
@@ -598,7 +551,6 @@ class _ProfileTabState extends State<ProfileTab> {
                     ),
                     child: Column(
                       children: [
-                        // Avatar
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
@@ -624,8 +576,6 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ),
                         const SizedBox(height: 16),
-
-                        // Nama & Username
                         Text(
                           _currentUser.nama,
                           style: const TextStyle(
@@ -641,10 +591,7 @@ class _ProfileTabState extends State<ProfileTab> {
                             fontSize: 14,
                           ),
                         ),
-
                         const SizedBox(height: 20),
-
-                        // Action Buttons Row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
@@ -658,17 +605,19 @@ class _ProfileTabState extends State<ProfileTab> {
                               icon: Icons.shield_outlined,
                               label: _currentUser.adminLevelName,
                               color: Colors.blue,
-                              onTap: () {}, // Info only
+                              onTap: () {},
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 24),
 
-                  // SECTION: DETAIL INFORMASI (New)
+                  // TAG: DIGITAL CARD / BARCODE SECTION
+                  _buildDigitalCardSection(),
+
+                  const SizedBox(height: 24),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -698,7 +647,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           'Status Warga',
                           _currentUser.statusWarga,
                         ),
-                        _buildDetailRow('No. WA', _currentUser.noWa), // Show WA
+                        _buildDetailRow('No. WA', _currentUser.noWa),
                         if (_currentUser.keperluan != null)
                           _buildDetailRow('Keperluan', _currentUser.keperluan),
                         if (_currentUser.detailKeperluan != null)
@@ -708,17 +657,10 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         if (_currentUser.keterangan != null)
                           _buildDetailRow('Catatan', _currentUser.keterangan),
-                        _buildDetailRow(
-                          'Admin ID',
-                          _currentUser.adminOrgId ?? '-',
-                        ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // Menu Keluar
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -743,7 +685,6 @@ class _ProfileTabState extends State<ProfileTab> {
                       onTap: _logout,
                     ),
                   ),
-
                   const SizedBox(height: 40),
                 ],
               ),
@@ -754,9 +695,85 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  Widget _buildDigitalCardSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF1A5F2D).withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.qr_code_2, color: Color(0xFF1A5F2D)),
+              const SizedBox(width: 8),
+              const Text(
+                'Identitas Presensi',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const Spacer(),
+              Text(
+                'AKTIF',
+                style: TextStyle(
+                  color: Colors.green[700],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _currentUser.nama.toUpperCase(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'ID: ${_currentUser.username}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    BarcodeWidget(
+                      barcode: Barcode.code128(),
+                      data: _currentUser.username,
+                      width: 140,
+                      height: 40,
+                      drawText: false,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: QrImageView(
+                    data: _currentUser.username,
+                    version: QrVersions.auto,
+                    size: 80.0,
+                    foregroundColor: const Color(0xFF1A5F2D),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, String? value) {
-    if (value == null || value.isEmpty)
-      return const SizedBox.shrink(); // Hide if empty
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -798,18 +815,17 @@ class _ProfileTabState extends State<ProfileTab> {
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: color),
+            Icon(icon, color: color, size: 18),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 13,
               ),
             ),
           ],

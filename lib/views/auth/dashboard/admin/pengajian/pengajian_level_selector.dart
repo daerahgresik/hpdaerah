@@ -6,8 +6,13 @@ import 'package:hpdaerah/services/materi_service.dart';
 
 class PengajianLevelSelector extends StatefulWidget {
   final String orgId;
+  final int adminLevel;
 
-  const PengajianLevelSelector({super.key, required this.orgId});
+  const PengajianLevelSelector({
+    super.key,
+    required this.orgId,
+    required this.adminLevel,
+  });
 
   @override
   State<PengajianLevelSelector> createState() => _PengajianLevelSelectorState();
@@ -21,6 +26,18 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
   @override
   void initState() {
     super.initState();
+    _initStream();
+  }
+
+  @override
+  void didUpdateWidget(covariant PengajianLevelSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.orgId != widget.orgId) {
+      _initStream();
+    }
+  }
+
+  void _initStream() {
     _templatesStream = _pengajianService.streamTemplates(widget.orgId);
   }
 
@@ -49,32 +66,39 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
         return Column(
           children: [
-            _buildSection(
-              context,
-              title: 'DAERAH',
-              level: 'Daerah',
-              color: Colors.red,
-              icon: Icons.flag,
-              templates: templates,
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              context,
-              title: 'DESA',
-              level: 'Desa',
-              color: Colors.blue,
-              icon: Icons.home_work,
-              templates: templates,
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              context,
-              title: 'KELOMPOK',
-              level: 'Kelompok',
-              color: Colors.green,
-              icon: Icons.groups,
-              templates: templates,
-            ),
+            if (widget.adminLevel == 0 || widget.adminLevel == 1)
+              _buildSection(
+                context,
+                title: 'DAERAH',
+                level: 'Daerah',
+                color: Colors.red,
+                icon: Icons.flag,
+                templates: templates,
+              ),
+            if (widget.adminLevel == 0 || widget.adminLevel == 1)
+              const SizedBox(height: 24),
+
+            if (widget.adminLevel == 0 || widget.adminLevel == 2)
+              _buildSection(
+                context,
+                title: 'DESA',
+                level: 'Desa',
+                color: Colors.blue,
+                icon: Icons.home_work,
+                templates: templates,
+              ),
+            if (widget.adminLevel == 0 || widget.adminLevel == 2)
+              const SizedBox(height: 24),
+
+            if (widget.adminLevel == 0 || widget.adminLevel == 3)
+              _buildSection(
+                context,
+                title: 'KELOMPOK',
+                level: 'Kelompok',
+                color: Colors.green,
+                icon: Icons.groups,
+                templates: templates,
+              ),
           ],
         );
       },

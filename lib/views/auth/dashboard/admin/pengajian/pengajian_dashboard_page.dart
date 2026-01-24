@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
+import 'package:hpdaerah/services/presensi_service.dart';
+import 'package:hpdaerah/models/user_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_search_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_selector.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_page.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
+  final UserModel user;
   final String orgId;
 
-  const PengajianDashboardPage({super.key, required this.orgId});
+  const PengajianDashboardPage({
+    super.key,
+    required this.user,
+    required this.orgId,
+  });
 
   @override
   State<PengajianDashboardPage> createState() => _PengajianDashboardPageState();
@@ -15,12 +25,97 @@ class PengajianDashboardPage extends StatefulWidget {
 
 class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   final _pengajianService = PengajianService();
+  final _presensiService = PresensiService();
   bool _showCreateRoom = false;
   bool _showActiveRoom = false;
 
+  String? _selectedOrgId;
+  List<Map<String, dynamic>> _daerahList = [];
+  bool _isFetchingDaerah = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedOrgId = widget.orgId;
+    if (widget.user.adminLevel == 0) {
+      _fetchDaerahList();
+    }
+  }
+
+  Future<void> _fetchDaerahList() async {
+    setState(() => _isFetchingDaerah = true);
+    try {
+      final response = await Supabase.instance.client
+          .from('organizations')
+          .select()
+          .eq('level', 0)
+          .order('name');
+
+      setState(() {
+        _daerahList = List<Map<String, dynamic>>.from(response);
+        // If Super Admin selects a Daerah, we update _selectedOrgId
+        // but initially we can leave it as the first one or null
+        if (_daerahList.isNotEmpty &&
+            (_selectedOrgId == null || _selectedOrgId!.isEmpty)) {
+          _selectedOrgId = _daerahList.first['id'];
+        }
+        _isFetchingDaerah = false;
+      });
+    } catch (e) {
+      debugPrint("Error Fetching Daerah: $e");
+      if (mounted) setState(() => _isFetchingDaerah = false);
+    }
+  }
+
+  void _openScanner(Pengajian pengajian) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BarcodeScannerPage(
+          pengajian: pengajian,
+          onResult: (username) async {
+            await _handleScanResult(pengajian, username);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleScanResult(Pengajian pengajian, String username) async {
+    try {
+      final user = await _presensiService.findUserByUsername(username);
+      if (user == null) {
+        if (mounted)
+          _showStatusSnackBar("User tidak ditemukan: $username", isError: true);
+        return;
+      }
+
+      await _presensiService.recordPresence(
+        pengajianId: pengajian.id,
+        userId: user.id!,
+        method: 'qr',
+      );
+
+      if (mounted) _showStatusSnackBar("Berhasil: ${user.nama} telah hadir");
+    } catch (e) {
+      if (mounted) _showStatusSnackBar("Gagal: $e", isError: true);
+    }
+  }
+
+  void _showStatusSnackBar(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.orgId.isEmpty) {
+    // Only show error if NOT super admin AND orgId is empty
+    if (widget.user.adminLevel != 0 && widget.orgId.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
@@ -56,6 +151,12 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 24),
+
+            // SUPER ADMIN DROPDOWN
+            if (widget.user.adminLevel == 0) ...[
+              _buildDaerahSelector(),
+              const SizedBox(height: 20),
+            ],
 
             // HORIZONTAL MENU ROW
             Row(
@@ -138,7 +239,10 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              PengajianLevelSelector(orgId: widget.orgId),
+              PengajianLevelSelector(
+                orgId: _selectedOrgId ?? widget.orgId,
+                adminLevel: widget.user.adminLevel ?? 0,
+              ),
               const SizedBox(height: 48), // Bottom padding
             ],
 
@@ -175,7 +279,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
 
   Widget _buildActiveRoomSection(BuildContext context) {
     return StreamBuilder<List<Pengajian>>(
-      stream: _pengajianService.streamActivePengajian(widget.orgId),
+      stream: _pengajianService.streamActivePengajian(
+        _selectedOrgId ?? widget.orgId,
+      ),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
@@ -235,6 +341,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListTile(
+                onTap: () => _openScanner(item),
                 contentPadding: const EdgeInsets.all(16),
                 leading: CircleAvatar(
                   backgroundColor: const Color(0xFF1A5F2D).withOpacity(0.1),
@@ -284,6 +391,55 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.groups_outlined,
+                          size: 14,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Target: ${item.targetAudience ?? 'Semua'}",
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A5F2D).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.qr_code_scanner,
+                            size: 14,
+                            color: Color(0xFF1A5F2D),
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            "Klik untuk Scan Kehadiran",
+                            style: TextStyle(
+                              color: Color(0xFF1A5F2D),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -395,6 +551,82 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDaerahSelector() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1A5F2D).withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.location_city_rounded,
+                color: Color(0xFF1A5F2D),
+                size: 20,
+              ),
+              SizedBox(width: 8),
+              Text(
+                "Pilih Daerah Pengelolaan",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_isFetchingDaerah)
+            const LinearProgressIndicator()
+          else
+            DropdownButtonFormField<String>(
+              value: _selectedOrgId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              items: _daerahList.map((d) {
+                return DropdownMenuItem<String>(
+                  value: d['id'],
+                  child: Text(d['name'] ?? 'Unknown Daerah'),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _selectedOrgId = val;
+                });
+              },
+            ),
+          const SizedBox(height: 4),
+          const Text(
+            "* Super Admin dapat mengelola pengajian di setiap daerah",
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -9,17 +9,7 @@ import 'package:hpdaerah/views/auth/dashboard/admin/presensi/presensi_center_pag
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_dashboard_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengguna/pengguna_list_page.dart';
 
-// ============================================================
-// QR CODE TAB
-// ============================================================
-class QrCodeTab extends StatelessWidget {
-  const QrCodeTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Halaman Scan QR Code (Segera Hadir)'));
-  }
-}
+// QR Code Tab moved to separate file
 
 // ============================================================
 // ADMIN TAB
@@ -104,6 +94,7 @@ class _AdminTabState extends State<AdminTab> {
         return const PresensiCenterPage();
       case '/admin/pengajian/buat':
         return PengajianDashboardPage(
+          user: widget.user,
           orgId: widget.user.adminOrgId ?? widget.user.currentOrgId ?? '',
         );
       case '/admin/pengguna':

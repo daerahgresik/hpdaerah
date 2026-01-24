@@ -114,6 +114,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
         title: _namaController.text,
         location: _lokasiController.text,
         description: _deskripsiController.text,
+        targetAudience: _selectedTarget,
         startedAt: startedAt,
       );
 

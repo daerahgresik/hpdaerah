@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 
 class PenggunaListPage extends StatefulWidget {
   final UserModel? currentUser;
@@ -367,6 +369,70 @@ class _PenggunaListPageState extends State<PenggunaListPage>
       default:
         return null;
     }
+  }
+
+  void _showUserBarcode(Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              user['nama'] ?? '-',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            Text(
+              '@${user['username'] ?? '-'}',
+              style: TextStyle(color: Colors.grey[500], fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A5F2D).withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: QrImageView(
+                data: user['username'] ?? '',
+                version: QrVersions.auto,
+                size: 180.0,
+                foregroundColor: const Color(0xFF1A5F2D),
+              ),
+            ),
+            const SizedBox(height: 24),
+            BarcodeWidget(
+              barcode: Barcode.code128(),
+              data: user['username'] ?? '',
+              width: 200,
+              height: 60,
+              drawText: false,
+              color: Colors.black87,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              (user['username'] ?? '').toString().toUpperCase(),
+              style: const TextStyle(
+                letterSpacing: 2,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAdminLevelDialog(Map<String, dynamic> user) {
@@ -1651,6 +1717,8 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     onSelected: (value) {
                       if (value == 'admin')
                         _showAdminLevelDialog(user);
+                      else if (value == 'barcode')
+                        _showUserBarcode(user);
                       else if (value == 'delete')
                         _deleteUser(user);
                     },
@@ -1660,6 +1728,12 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                         Icons.admin_panel_settings,
                         'Atur Level',
                         const Color(0xFF059669),
+                      ),
+                      _buildPopupMenuItem(
+                        'barcode',
+                        Icons.qr_code_2_rounded,
+                        'Lihat Barcode',
+                        const Color(0xFF1A5F2D),
                       ),
                       _buildPopupMenuItem(
                         'delete',

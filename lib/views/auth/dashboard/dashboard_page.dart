@@ -3,7 +3,8 @@ import 'dart:ui';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/views/auth/dashboard/beranda/home_tab.dart';
 import 'package:hpdaerah/views/auth/dashboard/navigator_menu_utama.dart';
-import 'package:hpdaerah/views/auth/dashboard/profil/profile_tab.dart'; // Import yang benar
+import 'package:hpdaerah/views/auth/dashboard/qrcode/qr_code_tab.dart';
+import 'package:hpdaerah/views/auth/dashboard/profil/profile_tab.dart';
 
 // Dashboard Page Controller
 class DashboardPage extends StatefulWidget {
@@ -19,7 +20,10 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
 
   List<Widget> get _pages {
-    List<Widget> pages = [HomeTab(user: widget.user), const QrCodeTab()];
+    List<Widget> pages = [
+      HomeTab(user: widget.user),
+      QrCodeTab(user: widget.user),
+    ];
     if (widget.user.isAdmin) {
       pages.add(AdminTab(user: widget.user));
     }
