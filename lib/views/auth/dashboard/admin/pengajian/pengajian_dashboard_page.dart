@@ -36,9 +36,13 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   @override
   void initState() {
     super.initState();
-    _selectedOrgId = widget.orgId;
-    if (widget.user.adminLevel == 0) {
+    // Initialize _selectedOrgId. If it's a Super Admin and orgId is empty, 
+    // keep it null to avoid Dropdown assertion errors.
+    if (widget.user.adminLevel == 0 && widget.orgId.isEmpty) {
+      _selectedOrgId = null;
       _fetchDaerahList();
+    } else {
+      _selectedOrgId = widget.orgId;
     }
   }
 
@@ -53,10 +57,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
 
       setState(() {
         _daerahList = List<Map<String, dynamic>>.from(response);
-        // If Super Admin selects a Daerah, we update _selectedOrgId
-        // but initially we can leave it as the first one or null
-        if (_daerahList.isNotEmpty &&
-            (_selectedOrgId == null || _selectedOrgId!.isEmpty)) {
+        // Automatically select the first daerah if none is selected
+        if (_daerahList.isNotEmpty && (_selectedOrgId == null || _selectedOrgId!.isEmpty)) {
           _selectedOrgId = _daerahList.first['id'];
         }
         _isFetchingDaerah = false;
@@ -421,9 +423,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         color: const Color(0xFF1A5F2D).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+                        children: const [
                           Icon(
                             Icons.qr_code_scanner,
                             size: 14,
@@ -573,8 +575,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
+          Row(
+            children: const [
               Icon(
                 Icons.location_city_rounded,
                 color: Color(0xFF1A5F2D),
@@ -592,8 +594,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
             const LinearProgressIndicator()
           else
             DropdownButtonFormField<String>(
-              value: _selectedOrgId,
+              value: (_selectedOrgId != null && _selectedOrgId!.isNotEmpty) ? _selectedOrgId : null,
               isExpanded: true,
+              hint: const Text("Pilih Daerah"),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
