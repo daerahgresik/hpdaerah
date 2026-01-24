@@ -3,8 +3,24 @@ import 'dart:ui';
 import 'package:hpdaerah/views/auth/login_page.dart';
 import 'package:hpdaerah/views/auth/register_page.dart';
 
-class HalamanDepan extends StatelessWidget {
+import 'package:hpdaerah/services/update_service.dart';
+
+class HalamanDepan extends StatefulWidget {
   const HalamanDepan({super.key});
+
+  @override
+  State<HalamanDepan> createState() => _HalamanDepanState();
+}
+
+class _HalamanDepanState extends State<HalamanDepan> {
+  @override
+  void initState() {
+    super.initState();
+    // Check for updates when app starts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService().checkForUpdate(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

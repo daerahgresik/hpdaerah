@@ -5,6 +5,7 @@ import 'package:hpdaerah/views/auth/dashboard/beranda/home_tab.dart';
 import 'package:hpdaerah/views/auth/dashboard/navigator_menu_utama.dart';
 import 'package:hpdaerah/views/auth/dashboard/qrcode/qr_code_tab.dart';
 import 'package:hpdaerah/views/auth/dashboard/profil/profile_tab.dart';
+import 'package:hpdaerah/services/notification_service.dart';
 
 // Dashboard Page Controller
 class DashboardPage extends StatefulWidget {
@@ -18,6 +19,18 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initNotifications();
+  }
+
+  void _initNotifications() async {
+    final notif = NotificationService();
+    await notif.init();
+    notif.startMonitoring(widget.user);
+  }
 
   List<Widget> get _pages {
     List<Widget> pages = [
