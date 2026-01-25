@@ -4,8 +4,6 @@ import 'package:hpdaerah/views/auth/login_page.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:hpdaerah/controllers/profile_controller.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:barcode_widget/barcode_widget.dart';
 
 class ProfileTab extends StatefulWidget {
   final UserModel user;
@@ -690,92 +688,6 @@ class _ProfileTabState extends State<ProfileTab> {
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDigitalCardSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.qr_code_2, color: Color(0xFF1A5F2D)),
-              const SizedBox(width: 8),
-              const Text(
-                'Identitas Presensi',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const Spacer(),
-              Text(
-                'AKTIF',
-                style: TextStyle(
-                  color: Colors.green[700],
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _currentUser.nama.toUpperCase(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      'ID: ${_currentUser.username}',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    BarcodeWidget(
-                      barcode: Barcode.code128(),
-                      data: _currentUser.username,
-                      width: 140,
-                      height: 40,
-                      drawText: false,
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Center(
-                  child: QrImageView(
-                    data: _currentUser.username,
-                    version: QrVersions.auto,
-                    size: 80.0,
-                    eyeStyle: const QrEyeStyle(
-                      eyeShape: QrEyeShape.square,
-                      color: Color(0xFF1A5F2D),
-                    ),
-                    dataModuleStyle: const QrDataModuleStyle(
-                      dataModuleShape: QrDataModuleShape.square,
-                      color: Color(0xFF1A5F2D),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ],
       ),

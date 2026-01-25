@@ -1238,8 +1238,8 @@ class _PenggunaListPageState extends State<PenggunaListPage>
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) {
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (statefulCtx, setStateDialog) {
           return AlertDialog(
             title: const Text('Edit Data User'),
             content: SingleChildScrollView(
@@ -1307,7 +1307,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(statefulCtx),
                 child: const Text('Batal'),
               ),
               ElevatedButton(
@@ -1325,8 +1325,8 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                         })
                         .eq('id', user['id']);
 
-                    if (mounted) {
-                      Navigator.pop(context);
+                    if (statefulCtx.mounted) {
+                      Navigator.pop(statefulCtx);
                       _showSnackBar('Data user berhasil diperbarui');
                       _loadData(); // Refresh list
                     }

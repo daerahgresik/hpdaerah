@@ -33,8 +33,9 @@ class _QrCodeTabState extends State<QrCodeTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.user.id == null)
+    if (widget.user.id == null) {
       return const Center(child: Text('User ID null'));
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[50],

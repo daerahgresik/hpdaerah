@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-﻿import 'package:supabase_flutter/supabase_flutter.dart';
-=======
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
->>>>>>> bb22edb4cde86073391206bc940ebb7205402800
 import '../models/presensi_model.dart';
 import '../models/user_model.dart';
 

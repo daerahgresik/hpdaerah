@@ -373,7 +373,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
                 leading: CircleAvatar(
-                  backgroundColor: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+                  backgroundColor: const Color(
+                    0xFF1A5F2D,
+                  ).withValues(alpha: 0.1),
                   child: const Icon(Icons.mosque, color: Color(0xFF1A5F2D)),
                 ),
                 title: Text(
@@ -457,10 +459,14 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1A5F2D).withOpacity(0.08),
+                            color: const Color(
+                              0xFF1A5F2D,
+                            ).withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: const Color(0xFF1A5F2D).withOpacity(0.2),
+                              color: const Color(
+                                0xFF1A5F2D,
+                              ).withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
@@ -620,7 +626,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1A5F2D).withValues(alpha: 0.2)),
+        border: Border.all(
+          color: const Color(0xFF1A5F2D).withValues(alpha: 0.2),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
