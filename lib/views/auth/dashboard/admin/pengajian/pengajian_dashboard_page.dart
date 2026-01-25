@@ -441,6 +441,51 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    // ATTENDANCE COUNT BADGE
+                    FutureBuilder<Map<String, int>>(
+                      future: _presensiService.getAttendanceSummary(
+                        item.id,
+                        item.orgId,
+                      ),
+                      builder: (context, snapshot) {
+                        final stats = snapshot.data ?? {'hadir': 0, 'izin': 0};
+                        final totalCheckin =
+                            (stats['hadir'] ?? 0) + (stats['izin'] ?? 0);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A5F2D).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(0xFF1A5F2D).withOpacity(0.2),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.person_pin_circle_outlined,
+                                size: 16,
+                                color: Color(0xFF1A5F2D),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                "$totalCheckin Orang Hadir/Izin",
+                                style: const TextStyle(
+                                  color: Color(0xFF1A5F2D),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
                 trailing: Row(

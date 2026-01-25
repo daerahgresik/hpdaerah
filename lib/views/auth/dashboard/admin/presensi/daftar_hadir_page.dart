@@ -26,10 +26,9 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
 
   Future<void> _fetchPengajianList() async {
     try {
-      // Ambil pengajian yang aktif atau baru selesai (misal 30 hari terakhir)
       final response = await _supabase
           .from('pengajian')
-          .select('id, title, started_at')
+          .select('id, title, started_at, org_id')
           .order('started_at', ascending: false)
           .limit(20);
 
@@ -42,6 +41,14 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
     } catch (e) {
       debugPrint("Error fetching pengajian list: $e");
     }
+  }
+
+  Map<String, dynamic>? get _selectedPengajian {
+    if (_selectedPengajianId == null) return null;
+    return _pengajianList.firstWhere(
+      (p) => p['id'] == _selectedPengajianId,
+      orElse: () => {},
+    );
   }
 
   @override
@@ -100,6 +107,47 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
         ),
         const Divider(height: 1),
 
+        // SUMMARY STATS
+        if (_selectedPengajianId != null)
+          FutureBuilder<Map<String, int>>(
+            future: _presensiService.getAttendanceSummary(
+              _selectedPengajianId!,
+              _selectedPengajian?['org_id'] ?? '',
+            ),
+            builder: (context, snapshot) {
+              final stats =
+                  snapshot.data ??
+                  {'hadir': 0, 'izin': 0, 'tidak_hadir': 0, 'total': 0};
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                color: Colors.grey[50],
+                child: Row(
+                  children: [
+                    _buildStatItem(
+                      "Hadir",
+                      stats['hadir'].toString(),
+                      Colors.green,
+                    ),
+                    _buildStatItem(
+                      "Izin",
+                      stats['izin'].toString(),
+                      Colors.orange,
+                    ),
+                    _buildStatItem(
+                      "Tidak Masuk",
+                      stats['tidak_hadir'].toString(),
+                      Colors.red,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        const Divider(height: 1),
+
         // DAFTAR PESERTA
         Expanded(
           child: _selectedPengajianId == null
@@ -117,46 +165,143 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
                     }
 
                     final list = snapshot.data ?? [];
-                    if (list.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 60,
-                              color: Colors.grey[300],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              "Belum ada peserta hadir",
-                              style: TextStyle(color: Colors.grey[500]),
-                            ),
-                          ],
+
+                    // REAL-TIME COUNTS FROM STREAM
+                    final hadirCount = list
+                        .where((p) => p.status == 'hadir')
+                        .length;
+                    final izinCount = list
+                        .where((p) => p.status == 'izin')
+                        .length;
+
+                    return Column(
+                      children: [
+                        // SUMMARY STATS (REACTIVE)
+                        FutureBuilder<int>(
+                          future: _presensiService.getTotalTargetUsers(
+                            _selectedPengajian?['org_id'] ?? '',
+                          ),
+                          builder: (context, totalSnapshot) {
+                            final total = totalSnapshot.data ?? 0;
+                            final tidakHadirCount =
+                                (total - hadirCount - izinCount).clamp(
+                                  0,
+                                  total,
+                                );
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              color: Colors.grey[50],
+                              child: Row(
+                                children: [
+                                  _buildStatItem(
+                                    "Hadir",
+                                    hadirCount.toString(),
+                                    Colors.green,
+                                  ),
+                                  _buildStatItem(
+                                    "Izin",
+                                    izinCount.toString(),
+                                    Colors.orange,
+                                  ),
+                                  _buildStatItem(
+                                    "Tidak Masuk",
+                                    tidakHadirCount.toString(),
+                                    Colors.red,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    }
+                        const Divider(height: 1),
 
-                    // Kita perlu fetch data user detail untuk setiap presensi
-                    // Agar bisa menampilkan Nama & Status
-                    // Idealnya di PresensiService stream sudah join, tapi untuk cepat kita fetch user detail here or use FutureBuilder inside item
-                    // Atau lebih baik Modify Presensi Model & Query to include user metadata.
-                    // For now, let's assume we fetch user data individually or modify query.
-                    // To keep it simple and reactive: Let's create a UserTile widget that fetches user info.
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: list.length,
-                      separatorBuilder: (ctx, i) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final presensi = list[index];
-                        return _PresensiUserTile(presensi: presensi);
-                      },
+                        // USER LIST
+                        Expanded(
+                          child: list.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.people_outline,
+                                        size: 60,
+                                        color: Colors.grey[300],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        "Belum ada peserta hadir",
+                                        style: TextStyle(
+                                          color: Colors.grey[500],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.separated(
+                                  padding: const EdgeInsets.all(16),
+                                  itemCount: list.length,
+                                  separatorBuilder: (ctx, i) =>
+                                      const SizedBox(height: 8),
+                                  itemBuilder: (context, index) {
+                                    final presensi = list[index];
+                                    return _PresensiUserTile(
+                                      presensi: presensi,
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     );
                   },
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -240,14 +385,22 @@ class _PresensiUserTile extends StatelessWidget {
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green[50],
+                color: presensi.status == 'izin'
+                    ? Colors.orange[50]
+                    : Colors.green[50],
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[100]!),
+                border: Border.all(
+                  color: presensi.status == 'izin'
+                      ? Colors.orange[100]!
+                      : Colors.green[100]!,
+                ),
               ),
-              child: const Text(
-                "HADIR",
+              child: Text(
+                presensi.status.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.green,
+                  color: presensi.status == 'izin'
+                      ? Colors.orange[700]
+                      : Colors.green,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
                 ),

@@ -614,9 +614,8 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                   const SizedBox(height: 24),
 
-                  // TAG: DIGITAL CARD / BARCODE SECTION
-                  _buildDigitalCardSection(),
-
+                  // TAG: DIGITAL CARD / BARCODE SECTION - REMOVED AS REQUESTED
+                  // _buildDigitalCardSection(),
                   const SizedBox(height: 24),
                   Container(
                     width: double.infinity,
