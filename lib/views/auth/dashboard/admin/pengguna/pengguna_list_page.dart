@@ -1227,6 +1227,122 @@ class _PenggunaListPageState extends State<PenggunaListPage>
         .length;
   }
 
+  void _showEditUserDialog(Map<String, dynamic> user) {
+    final nameCtrl = TextEditingController(text: user['nama']);
+    final usernameCtrl = TextEditingController(text: user['username']);
+    final passwordCtrl = TextEditingController(text: user['password'] ?? '');
+    final noWaCtrl = TextEditingController(text: user['no_wa'] ?? '');
+    final asalCtrl = TextEditingController(text: user['asal'] ?? '');
+    final statusCtrl = TextEditingController(text: user['status_warga'] ?? '');
+    bool isPasswordVisible = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: const Text('Edit Data User'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Lengkap',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: usernameCtrl,
+                    decoration: const InputDecoration(labelText: 'Username'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordCtrl,
+                    obscureText: !isPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          isPasswordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setStateDialog(() {
+                            isPasswordVisible = !isPasswordVisible;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Admin dapat melihat & mengubah password user secara langsung.',
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noWaCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'No. WhatsApp',
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: asalCtrl,
+                    decoration: const InputDecoration(labelText: 'Asal Daerah'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: statusCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Status Warga (Asli/Perantau)',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await Supabase.instance.client
+                        .from('users')
+                        .update({
+                          'nama': nameCtrl.text,
+                          'username': usernameCtrl.text,
+                          'password': passwordCtrl.text,
+                          'no_wa': noWaCtrl.text,
+                          'asal': asalCtrl.text,
+                          'status_warga': statusCtrl.text,
+                        })
+                        .eq('id', user['id']);
+
+                    if (mounted) {
+                      Navigator.pop(context);
+                      _showSnackBar('Data user berhasil diperbarui');
+                      _loadData(); // Refresh list
+                    }
+                  } catch (e) {
+                    _showSnackBar('Gagal update: $e', isError: true);
+                  }
+                },
+                child: const Text('Simpan'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1584,7 +1700,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: () => _showAdminLevelDialog(user),
+            onTap: () => _showEditUserDialog(user),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -1812,7 +1928,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     ),
                     offset: const Offset(0, 40),
                     onSelected: (value) {
-                      if (value == 'admin') {
+                      if (value == 'edit') {
+                        _showEditUserDialog(user);
+                      } else if (value == 'admin') {
                         _showAdminLevelDialog(user);
                       } else if (value == 'barcode') {
                         _showUserBarcode(user);
@@ -1821,6 +1939,12 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                       }
                     },
                     itemBuilder: (context) => [
+                      _buildPopupMenuItem(
+                        'edit',
+                        Icons.edit_outlined,
+                        'Edit Data',
+                        Colors.orange,
+                      ),
                       _buildPopupMenuItem(
                         'admin',
                         Icons.admin_panel_settings,

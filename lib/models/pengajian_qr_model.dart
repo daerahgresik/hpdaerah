@@ -15,6 +15,7 @@ class PengajianQr {
   final DateTime? pengajianStartedAt;
   final String? pengajianDescription;
   final String? targetAudience;
+  final String? presensiStatus; // hadir, izin, dll.
 
   PengajianQr({
     required this.id,
@@ -29,6 +30,7 @@ class PengajianQr {
     this.pengajianStartedAt,
     this.pengajianDescription,
     this.targetAudience,
+    this.presensiStatus,
   });
 
   factory PengajianQr.fromJson(Map<String, dynamic> json) {
@@ -66,6 +68,7 @@ class PengajianQr {
       targetAudience:
           pengajian?['target_audience'] as String? ??
           json['target_audience'] as String?,
+      presensiStatus: json['presensi_status'] as String?,
     );
   }
 
@@ -97,6 +100,7 @@ class PengajianQr {
     DateTime? pengajianStartedAt,
     String? pengajianDescription,
     String? targetAudience,
+    String? presensiStatus,
   }) {
     return PengajianQr(
       id: id ?? this.id,
@@ -111,6 +115,7 @@ class PengajianQr {
       pengajianStartedAt: pengajianStartedAt ?? this.pengajianStartedAt,
       pengajianDescription: pengajianDescription ?? this.pengajianDescription,
       targetAudience: targetAudience ?? this.targetAudience,
+      presensiStatus: presensiStatus ?? this.presensiStatus,
     );
   }
 }

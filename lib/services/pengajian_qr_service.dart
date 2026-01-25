@@ -142,9 +142,19 @@ class PengajianQrService {
                   DateTime.parse(endedAt).isAfter(DateTime.now());
 
               if (isActive) {
+                // Fetch presence status if it exists
+                final presensiResponse = await _client
+                    .from('presensi')
+                    .select('status')
+                    .eq('pengajian_id', pengajianId)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+
                 final enrichedData = {
                   ...qrData,
                   'pengajian': pengajianResponse,
+                  if (presensiResponse != null)
+                    'presensi_status': presensiResponse['status'],
                 };
                 results.add(PengajianQr.fromJson(enrichedData));
               }
