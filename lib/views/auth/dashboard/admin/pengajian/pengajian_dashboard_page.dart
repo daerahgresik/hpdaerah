@@ -372,7 +372,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListTile(
-                onTap: () => _openScanner(item),
                 contentPadding: const EdgeInsets.all(16),
                 leading: CircleAvatar(
                   backgroundColor: const Color(0xFF1A5F2D).withOpacity(0.1),
@@ -442,42 +441,27 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A5F2D).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.qr_code_scanner,
-                            size: 14,
-                            color: Color(0xFF1A5F2D),
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            "Klik untuk Scan Kehadiran",
-                            style: TextStyle(
-                              color: Color(0xFF1A5F2D),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  tooltip: "Hapus Room",
-                  onPressed: () => _confirmDeleteRoom(context, item),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tombol Scan
+                    IconButton(
+                      icon: const Icon(
+                        Icons.qr_code_scanner,
+                        color: Color(0xFF1A5F2D),
+                      ),
+                      tooltip: "Scan Kehadiran",
+                      onPressed: () => _openScanner(item),
+                    ),
+                    // Tombol Hapus
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      tooltip: "Hapus Room",
+                      onPressed: () => _confirmDeleteRoom(context, item),
+                    ),
+                  ],
                 ),
               ),
             );
