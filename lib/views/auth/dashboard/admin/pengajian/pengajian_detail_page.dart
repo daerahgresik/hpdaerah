@@ -17,7 +17,7 @@ class PengajianDetailPage extends StatefulWidget {
 
 class _PengajianDetailPageState extends State<PengajianDetailPage> {
   final _presensiService = PresensiService();
-  bool _isScanning = false;
+  final bool _isScanning = false;
 
   void _openScanner() async {
     final status = await Permission.camera.request();
@@ -233,8 +233,9 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
     return StreamBuilder<List<Presensi>>(
       stream: _presensiService.streamAttendanceList(widget.pengajian.id),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final list = snapshot.data!;
         if (list.isEmpty) {
           return const Center(

@@ -87,9 +87,9 @@ class _RegisterPageState extends State<RegisterPage> {
       // Use Controller
       final list = await _registerController.fetchChildren(parentId);
       setState(() {
-        if (level == 0)
+        if (level == 0) {
           _desaList = list;
-        else if (level == 1)
+        } else if (level == 1)
           _kelompokList = list;
         else if (level == 2)
           _kelasList = list;
@@ -476,8 +476,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                       validator: (value) {
                                         if (value == null ||
-                                            value.trim().isEmpty)
+                                            value.trim().isEmpty) {
                                           return 'Nama tidak boleh kosong';
+                                        }
                                         return null;
                                       },
                                     ),
@@ -497,8 +498,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                       validator: (value) {
                                         if (value == null ||
-                                            value.trim().isEmpty)
+                                            value.trim().isEmpty) {
                                           return 'No WA wajib diisi';
+                                        }
                                         return null;
                                       },
                                     ),
@@ -517,12 +519,15 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                       validator: (value) {
                                         if (value == null ||
-                                            value.trim().isEmpty)
+                                            value.trim().isEmpty) {
                                           return 'Username tidak boleh kosong';
-                                        if (value.contains(' '))
+                                        }
+                                        if (value.contains(' ')) {
                                           return 'Username tidak boleh ada spasi';
-                                        if (value.length < 3)
+                                        }
+                                        if (value.length < 3) {
                                           return 'Username minimal 3 karakter';
+                                        }
                                         return null;
                                       },
                                     ),
@@ -558,10 +563,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                             ),
                                           ),
                                       validator: (value) {
-                                        if (value == null || value.isEmpty)
+                                        if (value == null || value.isEmpty) {
                                           return 'Password tidak boleh kosong';
-                                        if (value.length < 6)
+                                        }
+                                        if (value.length < 6) {
                                           return 'Password minimal 6 karakter';
+                                        }
                                         return null;
                                       },
                                     ),
@@ -597,10 +604,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                             ),
                                           ),
                                       validator: (value) {
-                                        if (value == null || value.isEmpty)
+                                        if (value == null || value.isEmpty) {
                                           return 'Konfirmasi password tidak boleh kosong';
-                                        if (value != _passwordController.text)
+                                        }
+                                        if (value != _passwordController.text) {
                                           return 'Password tidak cocok';
+                                        }
                                         return null;
                                       },
                                     ),
@@ -628,8 +637,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                         setState(() => _selectedStatus = value);
                                       },
                                       validator: (value) {
-                                        if (value == null)
+                                        if (value == null) {
                                           return 'Pilih status Anda';
+                                        }
                                         return null;
                                       },
                                     ),
@@ -849,8 +859,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 _kelompokList.clear();
                                                 _kelasList.clear();
                                               });
-                                              if (val != null)
+                                              if (val != null) {
                                                 _loadChildren(val, 1);
+                                              }
                                             },
                                       validator: (val) =>
                                           val == null ? 'Pilih desa' : null,
@@ -893,8 +904,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 _selectedKelas = null;
                                                 _kelasList.clear();
                                               });
-                                              if (val != null)
+                                              if (val != null) {
                                                 _loadChildren(val, 2);
+                                              }
                                             },
                                       validator: (val) =>
                                           val == null ? 'Pilih kelompok' : null,

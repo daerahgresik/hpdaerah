@@ -196,4 +196,126 @@ class OrganizationService {
       );
     }
   }
+
+  /// Fetch single organization by ID
+  Future<Organization?> getOrgById(String id) async {
+    try {
+      final response = await _client
+          .from('organizations')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return Organization.fromJson(response);
+    } catch (e) {
+      debugPrint("Error fetch org by id: $e");
+      return null;
+    }
+  }
+
+  /// Get full path dari org tertentu ke atas sampai root (Daerah)
+  /// Returns list of org names from top (Daerah) to bottom (current org)
+  /// Contoh: ['Gresik', 'Kuwu', 'Klinter Barat', 'Muda-mudi']
+  Future<List<Organization>> getOrgPath(String orgId) async {
+    final path = <Organization>[];
+    String? currentId = orgId;
+
+    try {
+      while (currentId != null) {
+        final org = await getOrgById(currentId);
+        if (org == null) break;
+
+        path.insert(0, org); // Insert di awal agar urutan dari atas ke bawah
+        currentId = org.parentId;
+      }
+    } catch (e) {
+      debugPrint("Error getting org path: $e");
+    }
+
+    return path;
+  }
+
+  /// Get org path as formatted string
+  /// Contoh: "Daerah Gresik → Desa Kuwu → Kelompok Klinter Barat"
+  Future<String> getOrgPathString(String orgId) async {
+    final path = await getOrgPath(orgId);
+    if (path.isEmpty) return '';
+
+    final typeLabels = {
+      'daerah': 'Daerah',
+      'desa': 'Desa',
+      'kelompok': 'Kelompok',
+      'kategori_usia': '',
+    };
+
+    return path
+        .map((org) {
+          final label = typeLabels[org.type] ?? '';
+          return label.isNotEmpty ? '$label ${org.name}' : org.name;
+        })
+        .join(' • ');
+  }
+
+  /// Get admin scope info berdasarkan admin level dan org id
+  /// Returns map dengan 'title', 'subtitle', 'path'
+  Future<Map<String, String>> getAdminScopeInfo({
+    required int? adminLevel,
+    required String? adminOrgId,
+  }) async {
+    if (adminOrgId == null || adminOrgId.isEmpty) {
+      return {
+        'title': 'Admin',
+        'subtitle': 'Tidak ada organisasi terkait',
+        'path': '',
+      };
+    }
+
+    final path = await getOrgPath(adminOrgId);
+    if (path.isEmpty) {
+      return {
+        'title': 'Admin',
+        'subtitle': 'Organisasi tidak ditemukan',
+        'path': '',
+      };
+    }
+
+    final currentOrg = path.last;
+    final levelLabels = {
+      0: 'Super Admin',
+      1: 'Admin Daerah',
+      2: 'Admin Desa',
+      3: 'Admin Kelompok',
+      4: 'Admin Kategori',
+    };
+
+    String title = levelLabels[adminLevel] ?? 'Admin';
+    String subtitle = '';
+
+    // Build subtitle berdasarkan path
+    if (adminLevel == 1) {
+      // Admin Daerah
+      title = 'Admin Daerah: ${currentOrg.name}';
+      subtitle = '';
+    } else if (adminLevel == 2 && path.length >= 2) {
+      // Admin Desa
+      title = 'Admin Desa: ${currentOrg.name}';
+      subtitle = 'Daerah ${path[0].name}';
+    } else if (adminLevel == 3 && path.length >= 3) {
+      // Admin Kelompok
+      title = 'Admin Kelompok: ${currentOrg.name}';
+      subtitle = 'Desa ${path[1].name} • Daerah ${path[0].name}';
+    } else if (adminLevel == 4 && path.length >= 4) {
+      // Admin Kategori
+      title = 'Admin ${currentOrg.name}';
+      subtitle =
+          'Kelompok ${path[2].name} • Desa ${path[1].name} • Daerah ${path[0].name}';
+    }
+
+    return {
+      'title': title,
+      'subtitle': subtitle,
+      'path': await getOrgPathString(adminOrgId),
+    };
+  }
 }

@@ -274,8 +274,9 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                                       ),
                                     ]),
                                     builder: (context, snapshot) {
-                                      if (!snapshot.hasData)
+                                      if (!snapshot.hasData) {
                                         return const SizedBox.shrink();
+                                      }
                                       final desaCount = snapshot.data?[0] ?? 0;
                                       final kelompokCount =
                                           snapshot.data?[1] ?? 0;
@@ -308,8 +309,9 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                                     widget.org.id,
                                   ),
                                   builder: (context, snapshot) {
-                                    if (!snapshot.hasData)
+                                    if (!snapshot.hasData) {
                                       return const SizedBox.shrink();
+                                    }
                                     final count = snapshot.data ?? 0;
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 4),

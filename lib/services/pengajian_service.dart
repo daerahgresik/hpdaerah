@@ -2,8 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/pengajian_model.dart';
 
+import 'package:hpdaerah/services/pengajian_qr_service.dart';
+
 class PengajianService {
   final SupabaseClient _client = Supabase.instance.client;
+  final _qrService = PengajianQrService();
 
   Future<void> createPengajian(Pengajian pengajian) async {
     try {
@@ -19,14 +22,28 @@ class PengajianService {
         'is_template': false, // Pastikan bukan template
       };
 
-      // Hanya kirim ID jika tidak kosong (untuk update/specific ID).
-      // Jika kosong, biarkan Database generate UUID.
       if (pengajian.id.isNotEmpty) {
         data['id'] = pengajian.id;
       }
 
-      await _client.from('pengajian').insert(data);
-      debugPrint("Success Create Pengajian: ${pengajian.title}");
+      // 1. Simpan Pengajian & dapatkan ID-nya
+      final response = await _client
+          .from('pengajian')
+          .insert(data)
+          .select()
+          .single();
+
+      final newPengajianId = response['id'] as String;
+      debugPrint(
+        "Success Create Pengajian: ${pengajian.title} (ID: $newPengajianId)",
+      );
+
+      // 2. OTOMATIS GENERATE QR CODE untuk target user
+      // Ini menjalankan logika yang Anda minta: QR dibuat saat forum dikonfirmasi
+      await _qrService.generateQrForTargetUsers(
+        pengajianId: newPengajianId,
+        targetOrgId: pengajian.orgId,
+      );
     } catch (e) {
       debugPrint("Error Create Pengajian: $e");
       throw Exception('Gagal membuat pengajian: $e');
@@ -112,11 +129,21 @@ class PengajianService {
               List<Map<String, dynamic>>.from(data);
 
           final now = DateTime.now();
+          final currentUserId = _client.auth.currentUser?.id;
+
           return typedData
               .where((json) {
-                // 1. Filter Check
+                // 1. Filter Check (Org ID OR Created By Me)
+                // Admin bisa melihat pengajian yang dia buat UNTUK sub-organisasi
                 final jsonOrgId = json['org_id'];
-                if (jsonOrgId != orgId) return false;
+                final createdBy = json['created_by'];
+
+                // Allow if matches Org ID OR created by current user
+                final matchesOrg = jsonOrgId == orgId;
+                final isMyCreation =
+                    currentUserId != null && createdBy == currentUserId;
+
+                if (!matchesOrg && !isMyCreation) return false;
 
                 // 2. Template Check
                 final isTemplate = json['is_template'] == true;

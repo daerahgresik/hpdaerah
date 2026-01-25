@@ -16,7 +16,7 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _pengajianList = [];
   String? _selectedPengajianId;
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   void initState() {

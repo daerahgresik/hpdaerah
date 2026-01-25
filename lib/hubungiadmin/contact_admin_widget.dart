@@ -39,10 +39,11 @@ class ContactAdminWidget extends StatelessWidget {
         throw 'Could not launch $url';
       }
     } catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Tidak dapat membuka WhatsApp')),
         );
+      }
     }
   }
 
@@ -155,7 +156,7 @@ class ContactAdminWidget extends StatelessWidget {
                       ),
                     ),
                   )
-                  .toList(),
+                  ,
             ],
           ),
         );

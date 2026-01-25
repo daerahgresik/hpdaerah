@@ -102,11 +102,12 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
         );
       }
     } else {
-      if (mounted)
+      if (mounted) {
         _showStatusSnackBar(
           "Izin kamera diperlukan untuk scan.",
           isError: true,
         );
+      }
     }
   }
 
@@ -114,8 +115,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     try {
       final user = await _presensiService.findUserByUsername(username);
       if (user == null) {
-        if (mounted)
+        if (mounted) {
           _showStatusSnackBar("User tidak ditemukan: $username", isError: true);
+        }
         return;
       }
 

@@ -845,8 +845,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                       if (n.contains('muda')) return 1;
                                       if (n.contains('pra')) return 2;
                                       if (n.contains('caberawit') ||
-                                          n.contains('cabe'))
+                                          n.contains('cabe')) {
                                         return 3;
+                                      }
                                       return 4;
                                     }
 
@@ -1715,9 +1716,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     ),
                     offset: const Offset(0, 40),
                     onSelected: (value) {
-                      if (value == 'admin')
+                      if (value == 'admin') {
                         _showAdminLevelDialog(user);
-                      else if (value == 'barcode')
+                      } else if (value == 'barcode')
                         _showUserBarcode(user);
                       else if (value == 'delete')
                         _deleteUser(user);

@@ -104,6 +104,196 @@ Seluruh konten dalam menu Admin (Daftar Organisasi, Jadwal Pengajian, Rekap Pres
     *   Bisa menghapus data master yang tidak bisa dihapus admin lain.
 
 ---
-**Prinsip Keamanan (Logika Sistem):**
-1.  **Hierarki View:** Admin Level X hanya bisa melihat data Level X ke bawah. (Contoh: Admin Desa tidak bisa melihat data Desa tetangga, apalagi data Daerah).
-2.  **Hierarki Assignment:** Admin Level X hanya bisa mengangkat user menjadi admin setara (Level X) atau di bawahnya (Level > X). Admin Desa TIDAK BISA mengangkat seseorang menjadi Admin Daerah.
+
+## 4. SISTEM PENGELOLAAN BERDASARKAN KONTEKS ADMIN
+
+### A. Super Admin (Level 0) - Wajib Pilih Konteks Daerah
+
+**ATURAN UTAMA:** Super Admin **TIDAK BISA** langsung mengelola forum/pengajian tanpa memilih konteks daerah terlebih dahulu.
+
+**Alur:**
+1. Super Admin masuk ke menu Admin (Pengajian/Organisasi/Presensi)
+2. Sistem menampilkan dialog/screen **"Pilih Daerah yang Ingin Dikelola"**
+3. Super Admin memilih salah satu Daerah
+4. Setelah memilih, Super Admin **berperan sebagai** Admin Daerah tersebut
+5. Semua tampilan dan akses mengikuti aturan Admin Daerah yang dipilih
+6. **Informasi jelas ditampilkan**: "Anda sedang mengelola: **[Nama Daerah]**"
+
+**Tujuan:** Memastikan target pengajian selalu jelas dan terlockir ke jalur tertentu.
+
+---
+
+### B. Aturan Scope Admin (Hanya Bisa Kelola Jalur Sendiri)
+
+#### 1. Admin Daerah (Level 1)
+- **Scope:** Mengelola 1 Daerah beserta SELURUH anak-anaknya
+- **Bisa Buat Pengajian Level:** Daerah, Desa, Kelompok, Kategori (sampai Caberawit)
+- **TIDAK BISA:** Mengelola Daerah lain
+- **Tampilan Header:** `"Admin Daerah: [Nama Daerah]"`
+
+#### 2. Admin Desa (Level 2)
+- **Scope:** Mengelola 1 Desa beserta SELURUH anak-anaknya
+- **Bisa Buat Pengajian Level:** Desa, Kelompok, Kategori (sampai Caberawit)
+- **TIDAK BISA:** Mengelola Desa lain atau level Daerah
+- **Tampilan Header:** `"Admin Desa: [Nama Desa] • dari Daerah [Nama Daerah]"`
+
+#### 3. Admin Kelompok (Level 3)
+- **Scope:** Mengelola 1 Kelompok beserta SELURUH anak-anaknya
+- **Bisa Buat Pengajian Level:** Kelompok, Kategori (sampai Caberawit)
+- **TIDAK BISA:** Mengelola Kelompok lain atau level di atasnya
+- **Tampilan Header:** `"Admin Kelompok: [Nama Kelompok] • Desa [Nama Desa] • Daerah [Nama Daerah]"`
+
+#### 4. Admin Kategori (Level 4)
+- **Scope:** Mengelola 1 Kategori saja
+- **Bisa Buat Pengajian Level:** Hanya Kategori-nya saja
+- **TIDAK BISA:** Mengelola Kategori lain atau level di atasnya
+- **Tampilan Header:** `"Admin [Nama Kategori] • Kelompok [X] • Desa [Y] • Daerah [Z]"`
+
+---
+
+### C. Tampilan Menu Pengajian Berdasarkan Level Admin
+
+Menu buat pengajian harus menampilkan:
+1. **Header Identitas Admin** (siapa dia, dari mana jalurnya)
+2. **Pilihan Level Pengajian** yang sesuai dengan scope admin
+3. **Tree Navigator** untuk memilih target spesifik dalam scope-nya
+
+**Contoh UI untuk Admin Desa:**
+```
+┌─────────────────────────────────────────────┐
+│ 👤 Anda adalah Admin Desa                   │
+│ 📍 Desa: Kuwu                               │
+│ 📍 Dari Daerah: Gresik                      │
+├─────────────────────────────────────────────┤
+│ Pilih Level Pengajian:                      │
+│ ○ Desa (Semua warga Desa Kuwu)              │
+│ ○ Kelompok (Pilih kelompok...)              │
+│ ○ Kategori (Pilih kelas...)                 │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 5. SISTEM QR CODE BERBASIS PENGAJIAN
+
+### A. Perubahan Paradigma QR Code
+
+| Sistem Lama (SALAH) | Sistem Baru (BENAR) |
+|---------------------|---------------------|
+| QR Code per User (permanen) | QR Code per Pengajian (sementara) |
+| Semua user punya QR | Hanya target pengajian yang dapat QR |
+| QR bisa dipakai berulang | QR sekali pakai |
+| QR sama untuk semua event | QR unik per user per pengajian |
+
+---
+
+### B. Alur Generate QR Code
+
+1. **Admin membuat Pengajian** dan menentukan:
+   - Level pengajian (Daerah/Desa/Kelompok/Kategori)
+   - Target spesifik (organisasi mana)
+   - Waktu, lokasi, deskripsi, dll
+
+2. **Admin klik "Konfirmasi Buat Pengajian"**
+
+3. **Sistem otomatis:**
+   - Mengidentifikasi SEMUA user yang menjadi target (berdasarkan org_id)
+   - Generate QR Code UNIK untuk setiap user target
+   - Simpan ke tabel `pengajian_qr`
+   - Push notification ke user target (opsional)
+
+4. **User target:**
+   - Membuka menu "QR Code"
+   - Melihat QR Code aktif untuk pengajian yang ditugaskan
+   - Melihat informasi lengkap pengajian
+
+---
+
+### C. Tampilan Menu QR Code untuk User
+
+#### Kondisi 1: Tidak Ada Pengajian Aktif
+```
+┌─────────────────────────────────────────────┐
+│              📭 TIDAK ADA PENGAJIAN         │
+│                                             │
+│  Saat ini Anda tidak memiliki              │
+│  tugas pengajian yang harus dihadiri.      │
+│                                             │
+│  Hubungi admin jika ada pertanyaan.        │
+└─────────────────────────────────────────────┘
+```
+
+#### Kondisi 2: Ada Pengajian Aktif (QR Belum Dipakai)
+```
+┌─────────────────────────────────────────────┐
+│         📋 PENGAJIAN AKTIF                  │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │         [QR CODE IMAGE]              │   │
+│  │         (Unik untuk Anda)            │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  📌 Pengajian Rutin Minggu Ini             │
+│  📍 Masjid Al-Ikhlas, Kuwu                 │
+│  📅 Minggu, 26 Jan 2026 • 08:00 WIB        │
+│  👥 Target: Muda-mudi                       │
+│                                             │
+│  ⚠️ Tunjukkan QR ini ke Admin saat hadir   │
+│  ⚠️ QR hanya bisa digunakan SEKALI          │
+└─────────────────────────────────────────────┘
+```
+
+#### Kondisi 3: QR Sudah Dipakai (Sudah Presensi)
+```
+┌─────────────────────────────────────────────┐
+│         ✅ PRESENSI BERHASIL                │
+│                                             │
+│  Anda telah hadir di pengajian:            │
+│  📌 Pengajian Rutin Minggu Ini             │
+│  📍 Masjid Al-Ikhlas, Kuwu                 │
+│  ⏰ Hadir pada: 08:15 WIB                   │
+│                                             │
+│  🎉 Semoga berkah dan bermanfaat!          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+### D. Aturan QR Code
+
+1. **UNIK:** Setiap QR Code berbeda untuk setiap kombinasi (user + pengajian)
+2. **SEKALI PAKAI:** Setelah di-scan, QR tidak bisa dipakai lagi (is_used = true)
+3. **TERBATAS WAKTU:** QR hanya valid selama pengajian berlangsung
+4. **TARGET SAJA:** Hanya user yang masuk dalam target audience yang mendapat QR
+5. **INFORMATIF:** QR selalu disertai info lengkap (apa, kapan, di mana)
+
+---
+
+### E. Tabel Database `pengajian_qr`
+
+```sql
+CREATE TABLE pengajian_qr (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pengajian_id UUID REFERENCES pengajian(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  qr_code TEXT UNIQUE NOT NULL,  -- Hash unik
+  is_used BOOLEAN DEFAULT false,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(pengajian_id, user_id)  -- 1 user = 1 QR per pengajian
+);
+```
+
+---
+
+## 6. PRINSIP KEAMANAN (LOGIKA SISTEM)
+
+1. **Hierarki View:** Admin Level X hanya bisa melihat data Level X ke bawah. (Contoh: Admin Desa tidak bisa melihat data Desa tetangga, apalagi data Daerah).
+
+2. **Hierarki Assignment:** Admin Level X hanya bisa mengangkat user menjadi admin setara (Level X) atau di bawahnya (Level > X). Admin Desa TIDAK BISA mengangkat seseorang menjadi Admin Daerah.
+
+3. **Konteks Terkunci:** Super Admin harus memilih konteks daerah sebelum bisa mengelola apapun, memastikan scope selalu jelas.
+
+4. **QR Sekali Pakai:** Mencegah penyalahgunaan (titip absen, share QR, dll).
+
+5. **Target Spesifik:** Pengajian selalu punya target yang jelas, QR hanya untuk target tersebut.

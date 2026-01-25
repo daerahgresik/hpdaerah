@@ -361,8 +361,9 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                   context: context,
                                   initialTime: selectedTime,
                                 );
-                                if (t != null)
+                                if (t != null) {
                                   setStateDialog(() => selectedTime = t);
+                                }
                               },
                               icon: const Icon(Icons.access_time, size: 16),
                               label: Text(selectedTime.format(context)),
@@ -386,8 +387,9 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                   context: context,
                                   initialTime: selectedEndTime,
                                 );
-                                if (t != null)
+                                if (t != null) {
                                   setStateDialog(() => selectedEndTime = t);
+                                }
                               },
                               icon: const Icon(
                                 Icons.access_time_filled,
@@ -685,7 +687,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                 // Actually, I can use _pengajianService.client... in here?
                                 // No, keep it clean.
                                 // I will mark as TODO:
-                                debugPrint("Updating template ${template!.id}");
+                                debugPrint("Updating template ${template.id}");
                                 // Temporary: Delete & Create (DANGEROUS BUT WORKS FOR PROTOTYPE)
                                 await _pengajianService.deletePengajian(
                                   template.id,
