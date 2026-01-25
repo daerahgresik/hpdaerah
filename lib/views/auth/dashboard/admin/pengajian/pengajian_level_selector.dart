@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/models/materi_model.dart';
@@ -133,7 +133,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -144,7 +144,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: color.withOpacity(0.8),
+                  color: color.withValues(alpha: 0.8),
                   letterSpacing: 1.2,
                 ),
               ),
@@ -164,7 +164,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.08),
+                    color: color.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.grey.shade300),
                   ),
@@ -301,7 +301,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildDetailRow("Nama", template.title ?? '-'),
+                  _buildDetailRow("Nama", template.title),
                   _buildDetailRow("Lokasi", template.location ?? '-'),
                   _buildDetailRow(
                     "Target",
@@ -674,40 +674,36 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                 'Saving template for OrgID: ${widget.orgId}',
                               );
                               if (isEdit) {
-                                // TODO: Implement Update Template properly.
-                                // For now, we reuse createTemplate but we need ID handling.
-                                // Simplest way if Service doesn't support update yet:
-                                // Ensure Service supports Upsert or Delete-Then-Create (Bad practice but works).
-                                // Let's try Delete then Create for now to ensure it works immediately without changing service logic deeply,
-                                // OR better: Just create a NEW one and user deletes old one? No, bad UX.
-                                // I will Add updateTemplate to service in NEXT Task Step.
-                                // For now, I'll allow this block to exist but it might fail or create duplicate if I call create.
-                                // Let's call createTemplate for now (it will likely create duplicate).
-                                // I will Notify User that "Edit might create duplicate until service updated".
-                                // Actually, I can use _pengajianService.client... in here?
-                                // No, keep it clean.
-                                // I will mark as TODO:
-                                debugPrint("Updating template ${template.id}");
-                                // Temporary: Delete & Create (DANGEROUS BUT WORKS FOR PROTOTYPE)
-                                await _pengajianService.deletePengajian(
-                                  template.id,
+                                await _pengajianService.updateTemplate(
+                                  Pengajian(
+                                    id: template.id,
+                                    orgId: widget.orgId,
+                                    title: titleController.text,
+                                    description: descController.text,
+                                    location: locationController.text,
+                                    targetAudience: selectedTarget,
+                                    startedAt: template.startedAt,
+                                    isTemplate: true,
+                                    templateName: titleController.text,
+                                    level: template.level,
+                                  ),
+                                );
+                              } else {
+                                await _pengajianService.createTemplate(
+                                  Pengajian(
+                                    id: '',
+                                    orgId: widget.orgId,
+                                    title: titleController.text,
+                                    description: descController.text,
+                                    location: locationController.text,
+                                    targetAudience: selectedTarget,
+                                    startedAt: DateTime.now(),
+                                    isTemplate: true,
+                                    templateName: titleController.text,
+                                    level: _levelToInt(level),
+                                  ),
                                 );
                               }
-
-                              await _pengajianService.createTemplate(
-                                Pengajian(
-                                  id: '', // New ID (since we deleted old one for "update")
-                                  orgId: widget.orgId,
-                                  title: titleController.text,
-                                  description: descController.text,
-                                  location: locationController.text,
-                                  targetAudience: selectedTarget,
-                                  startedAt: DateTime.now(),
-                                  isTemplate: true,
-                                  templateName: titleController.text,
-                                  level: _levelToInt(level),
-                                ),
-                              );
 
                               if (context.mounted) {
                                 Navigator.pop(ctx);

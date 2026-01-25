@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -66,8 +66,8 @@ class UpdateService {
       context: context,
       barrierDismissible: !forceUpdate,
       builder: (context) {
-        return WillPopScope(
-          onWillPop: () async => !forceUpdate,
+        return PopScope(
+          canPop: !forceUpdate,
           child: AlertDialog(
             title: const Text('Update Tersedia'),
             content: Column(
@@ -103,6 +103,7 @@ class UpdateService {
                         mode: LaunchMode.externalApplication,
                       );
                     } else {
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Gagal membuka link")),
                       );

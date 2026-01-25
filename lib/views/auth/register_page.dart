@@ -5,7 +5,7 @@ import 'package:hpdaerah/controllers/register_controller.dart'; // Import Contro
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
-import 'package:hpdaerah/models/user_model.dart'; // Import User Model
+// Import User Model
 import 'package:hpdaerah/hubungiadmin/contact_admin_widget.dart'; // Import New Widget
 
 class RegisterPage extends StatefulWidget {
@@ -73,9 +73,11 @@ class _RegisterPageState extends State<RegisterPage> {
         _daerahList = list;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat daerah: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal memuat daerah: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoadingHierarchy = false);
     }
@@ -89,15 +91,18 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() {
         if (level == 0) {
           _desaList = list;
-        } else if (level == 1)
+        } else if (level == 1) {
           _kelompokList = list;
-        else if (level == 2)
+        } else if (level == 2) {
           _kelasList = list;
+        }
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isLoadingHierarchy = false);
     }
@@ -235,11 +240,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }) {
     return InputDecoration(
       labelText: isOptional ? '$label (Opsional)' : label,
-      labelStyle: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
-      prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.7), size: 22),
+      labelStyle: TextStyle(
+        color: Colors.white.withValues(alpha: 0.8),
+        fontSize: 14,
+      ),
+      prefixIcon: Icon(
+        icon,
+        color: Colors.white.withValues(alpha: 0.7),
+        size: 22,
+      ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -254,7 +266,7 @@ class _RegisterPageState extends State<RegisterPage> {
         borderSide: const BorderSide(color: Colors.redAccent, width: 2),
       ),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
+      fillColor: Colors.white.withValues(alpha: 0.05),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       errorStyle: const TextStyle(fontSize: 11),
     );
@@ -272,7 +284,7 @@ class _RegisterPageState extends State<RegisterPage> {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
         ],
@@ -314,7 +326,10 @@ class _RegisterPageState extends State<RegisterPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [Colors.lime.withOpacity(0.1), Colors.transparent],
+                  colors: [
+                    Colors.lime.withValues(alpha: 0.1),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -328,7 +343,10 @@ class _RegisterPageState extends State<RegisterPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [Colors.teal.withOpacity(0.15), Colors.transparent],
+                  colors: [
+                    Colors.teal.withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -351,7 +369,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         icon: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -391,10 +409,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             child: Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                 ),
                               ),
                               child: Form(
@@ -411,13 +429,13 @@ class _RegisterPageState extends State<RegisterPage> {
                                           width: 100,
                                           height: 100,
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(
-                                              0.1,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.1,
                                             ),
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color: Colors.white.withOpacity(
-                                                0.3,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.3,
                                               ),
                                               width: 2,
                                             ),
@@ -436,7 +454,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                                     Icon(
                                                       Icons.camera_alt_outlined,
                                                       color: Colors.white
-                                                          .withOpacity(0.7),
+                                                          .withValues(
+                                                            alpha: 0.7,
+                                                          ),
                                                       size: 32,
                                                     ),
                                                     const SizedBox(height: 4),
@@ -444,7 +464,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                                       'Tambah',
                                                       style: TextStyle(
                                                         color: Colors.white
-                                                            .withOpacity(0.6),
+                                                            .withValues(
+                                                              alpha: 0.6,
+                                                            ),
                                                         fontSize: 11,
                                                       ),
                                                     ),
@@ -551,8 +573,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 _obscurePassword
                                                     ? Icons.visibility_off
                                                     : Icons.visibility,
-                                                color: Colors.white.withOpacity(
-                                                  0.7,
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.7,
                                                 ),
                                                 size: 22,
                                               ),
@@ -592,8 +614,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 _obscureConfirmPassword
                                                     ? Icons.visibility_off
                                                     : Icons.visibility,
-                                                color: Colors.white.withOpacity(
-                                                  0.7,
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.7,
                                                 ),
                                                 size: 22,
                                               ),
@@ -658,15 +680,15 @@ class _RegisterPageState extends State<RegisterPage> {
                                           labelText:
                                               'Asal (isi jika perantau, contoh: Banda Aceh)',
                                           labelStyle: TextStyle(
-                                            color: Colors.white.withOpacity(
-                                              0.8,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.8,
                                             ),
                                             fontSize: 13,
                                           ),
                                           prefixIcon: Icon(
                                             Icons.flight_land_outlined,
-                                            color: Colors.white.withOpacity(
-                                              0.7,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.7,
                                             ),
                                             size: 22,
                                           ),
@@ -675,8 +697,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                               14,
                                             ),
                                             borderSide: BorderSide(
-                                              color: Colors.white.withOpacity(
-                                                0.3,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.3,
                                               ),
                                             ),
                                           ),
@@ -707,8 +729,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 ),
                                               ),
                                           filled: true,
-                                          fillColor: Colors.white.withOpacity(
-                                            0.05,
+                                          fillColor: Colors.white.withValues(
+                                            alpha: 0.05,
                                           ),
                                           contentPadding:
                                               const EdgeInsets.symmetric(
@@ -1012,7 +1034,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             Text(
                               'Sudah punya akun? ',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white.withValues(alpha: 0.8),
                               ),
                             ),
                             GestureDetector(

@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
 
@@ -47,8 +47,30 @@ class ProfileController {
         updates['foto_profil'] = imageUrl;
       }
 
-      // Update to Supabase
-      await _client.from('users').update(updates).eq('id', currentUser.id!);
+      // --- SELECT TABLE & FIELDS BASED ON ROLE ---
+      if (currentUser.isSuperAdmin) {
+        // Super Admin -> 'super_admins' table
+        // Only update fields that exist in super_admins
+        final superAdminUpdates = {
+          'nama': nama,
+          'username': username,
+          if (newPassword != null && newPassword.isNotEmpty)
+            'password': newPassword,
+        };
+
+        // Note: super_admins table doesn't have profile photo column in this schema yet,
+        // but if we want to support it, we'd need to add it or ignore it.
+        // For now we'll ignore photo update for super admin or handle it if column exists.
+        // Assuming we haven't added 'foto_profil' to super_admins yet in SQL.
+
+        await _client
+            .from('super_admins')
+            .update(superAdminUpdates)
+            .eq('id', currentUser.id!);
+      } else {
+        // Regular User / Other Admins -> 'users' table
+        await _client.from('users').update(updates).eq('id', currentUser.id!);
+      }
 
       // Return updated model locally
       return currentUser.copyWith(

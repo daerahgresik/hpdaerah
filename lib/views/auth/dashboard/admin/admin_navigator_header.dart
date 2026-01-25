@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/organization_model.dart';
 import 'package:hpdaerah/services/organization_service.dart';
@@ -96,7 +96,7 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -177,7 +177,7 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -216,7 +216,7 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
                           _adminInfo['subtitle']!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -234,9 +234,9 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -350,7 +350,7 @@ class _DaerahSelectorSheetState extends State<DaerahSelectorSheet> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1A5F2D).withOpacity(0.1),
+                    color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -474,13 +474,13 @@ class _AdminMenuChip extends StatelessWidget {
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF059669)
-                : Colors.grey.withOpacity(0.25),
+                : Colors.grey.withValues(alpha: 0.25),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF059669).withOpacity(0.25),
+                    color: const Color(0xFF059669).withValues(alpha: 0.25),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),

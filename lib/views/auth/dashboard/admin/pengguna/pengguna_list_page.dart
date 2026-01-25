@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
@@ -98,12 +97,15 @@ class _PenggunaListPageState extends State<PenggunaListPage>
         _applyFilters();
         _isLoading = false;
       });
-      _fadeController.forward(from: 0);
-    } catch (e) {
       if (mounted) {
-        _showSnackBar('Error: $e', isError: true);
-        setState(() => _isLoading = false);
+        _fadeController.forward(from: 0);
       }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('Error: $e', isError: true);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -289,6 +291,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
       await _loadData();
       final levelName = _getAdminLevelName(level);
       final orgName = _getOrgName(orgId);
+      if (!mounted) {
+        return;
+      }
       _showSnackBar(
         level != null
             ? '${user['nama']} → $levelName${orgName != null ? ' ($orgName)' : ''}'
@@ -393,14 +398,21 @@ class _PenggunaListPageState extends State<PenggunaListPage>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A5F2D).withOpacity(0.05),
+                color: const Color(0xFF1A5F2D).withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: QrImageView(
                 data: user['username'] ?? '',
                 version: QrVersions.auto,
                 size: 180.0,
-                foregroundColor: const Color(0xFF1A5F2D),
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: Color(0xFF1A5F2D),
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: Color(0xFF1A5F2D),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -541,7 +553,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: const Icon(
@@ -567,7 +579,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                     Text(
                                       user['nama'] ?? '-',
                                       style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.9,
+                                        ),
                                         fontSize: 14,
                                       ),
                                     ),
@@ -617,12 +631,12 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           decoration: BoxDecoration(
                             color: _getAdminLevelColor(
                               currentLevel,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: _getAdminLevelColor(
                                 currentLevel,
-                              ).withOpacity(0.3),
+                              ).withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -773,10 +787,14 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF059669).withOpacity(0.1),
+                              color: const Color(
+                                0xFF059669,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: const Color(0xFF059669).withOpacity(0.3),
+                                color: const Color(
+                                  0xFF059669,
+                                ).withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
@@ -995,7 +1013,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
   }) {
     return Material(
       color: isSelected
-          ? const Color(0xFF059669).withOpacity(0.1)
+          ? const Color(0xFF059669).withValues(alpha: 0.1)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -1070,7 +1088,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1084,7 +1102,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withOpacity(0.2)
+                      ? Colors.white.withValues(alpha: 0.2)
                       : Colors.white,
                   shape: BoxShape.circle,
                 ),
@@ -1127,7 +1145,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -1246,7 +1264,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
@@ -1272,7 +1290,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           Text(
                             '${_users.length} pengguna • ${_users.where((u) => u['is_admin'] == true).length} admin',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontSize: 13,
                             ),
                           ),
@@ -1291,7 +1309,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 15,
                         offset: const Offset(0, 5),
                       ),
@@ -1349,7 +1367,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1400,7 +1418,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                     BoxShadow(
                                       color: const Color(
                                         0xFF059669,
-                                      ).withOpacity(0.3),
+                                      ).withValues(alpha: 0.3),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),
@@ -1438,7 +1456,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? Colors.white.withOpacity(0.25)
+                                      ? Colors.white.withValues(alpha: 0.25)
                                       : Colors.grey[100],
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1500,7 +1518,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 20,
                 ),
               ],
@@ -1555,7 +1573,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -1586,7 +1604,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                     _getAdminLevelColor(adminLevel),
                                     _getAdminLevelColor(
                                       adminLevel,
-                                    ).withOpacity(0.7),
+                                    ).withValues(alpha: 0.7),
                                   ]
                                 : [Colors.grey[400]!, Colors.grey[500]!],
                           ),
@@ -1713,7 +1731,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                       _getAdminLevelColor(adminLevel),
                                       _getAdminLevelColor(
                                         adminLevel,
-                                      ).withOpacity(0.8),
+                                      ).withValues(alpha: 0.8),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(20),
@@ -1796,10 +1814,11 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     onSelected: (value) {
                       if (value == 'admin') {
                         _showAdminLevelDialog(user);
-                      } else if (value == 'barcode')
+                      } else if (value == 'barcode') {
                         _showUserBarcode(user);
-                      else if (value == 'delete')
+                      } else if (value == 'delete') {
                         _deleteUser(user);
+                      }
                     },
                     itemBuilder: (context) => [
                       _buildPopupMenuItem(
@@ -1857,7 +1876,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 18),
@@ -1879,9 +1898,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

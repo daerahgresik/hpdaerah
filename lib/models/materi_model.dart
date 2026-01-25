@@ -1,4 +1,4 @@
-class Materi {
+﻿class Materi {
   final String id;
   final String? orgId;
   final String tanggal;

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/views/auth/login_page.dart';
 import 'package:image_picker/image_picker.dart';
@@ -155,7 +155,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 10,
                             ),
                           ],
@@ -543,7 +543,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -556,13 +556,15 @@ class _ProfileTabState extends State<ProfileTab> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: primaryGreen.withOpacity(0.2),
+                              color: primaryGreen.withValues(alpha: 0.2),
                               width: 2,
                             ),
                           ),
                           child: CircleAvatar(
                             radius: 45,
-                            backgroundColor: primaryGreen.withOpacity(0.1),
+                            backgroundColor: primaryGreen.withValues(
+                              alpha: 0.1,
+                            ),
                             backgroundImage: _currentUser.fotoProfil != null
                                 ? NetworkImage(_currentUser.fotoProfil!)
                                 : null,
@@ -702,7 +704,9 @@ class _ProfileTabState extends State<ProfileTab> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1A5F2D).withOpacity(0.1)),
+        border: Border.all(
+          color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+        ),
       ),
       child: Column(
         children: [
@@ -761,7 +765,14 @@ class _ProfileTabState extends State<ProfileTab> {
                     data: _currentUser.username,
                     version: QrVersions.auto,
                     size: 80.0,
-                    foregroundColor: const Color(0xFF1A5F2D),
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF1A5F2D),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Color(0xFF1A5F2D),
+                    ),
                   ),
                 ),
               ),
@@ -813,7 +824,7 @@ class _ProfileTabState extends State<ProfileTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(

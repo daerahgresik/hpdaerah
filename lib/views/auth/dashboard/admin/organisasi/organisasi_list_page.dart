@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/organization_model.dart';
 import 'package:hpdaerah/services/organization_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/organisasi/organisasi_form_page.dart';
@@ -154,10 +154,6 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
     setState(() => _isExpanded = !_isExpanded);
   }
 
-  void _showActionDialog() {
-    // Bisa gunakan bottom sheet atau popup menu
-  }
-
   @override
   Widget build(BuildContext context) {
     final isLeaf = (widget.org.level ?? 0) >= 3;
@@ -172,14 +168,14 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
             border: Border.all(
               color: _isExpanded
-                  ? _levelColor.withOpacity(0.5)
+                  ? _levelColor.withValues(alpha: 0.5)
                   : Colors.transparent,
               width: 1.5,
             ),
@@ -199,7 +195,7 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: _levelColor.withOpacity(0.1),
+                        color: _levelColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -363,7 +359,7 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                             color: Colors.redAccent,
                           ),
                           visualDensity: VisualDensity.compact,
-                          onPressed: () => _confirmDelete(context),
+                          onPressed: _confirmDelete,
                         ),
                         // Arrow for expand
                         if (!isLeaf)
@@ -455,10 +451,10 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: _levelColor.withOpacity(0.1),
+                                color: _levelColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: _levelColor.withOpacity(0.3),
+                                  color: _levelColor.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -563,7 +559,7 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context) async {
+  Future<void> _confirmDelete() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -591,17 +587,19 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
       try {
         await _service.deleteOrganization(widget.org.id);
         // Tidak perlu refresh manual, karena Stream akan otomatis update UI
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Berhasil dihapus")));
+        if (!mounted) {
+          return;
         }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Berhasil dihapus")));
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("Gagal: $e")));
+        if (!mounted) {
+          return;
         }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal: $e")));
       }
     }
   }

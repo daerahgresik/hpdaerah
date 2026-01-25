@@ -1,23 +1,46 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+﻿import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final SupabaseClient _client = Supabase.instance.client;
 
-  /// Get current authenticated user details from 'users' table
+  /// Get current authenticated user details from 'users' table or 'super_admins' table
   Future<UserModel?> getCurrentUser(String username) async {
     try {
-      final response = await _client
+      // 1. Try finding in regular 'users' table
+      final userResponse = await _client
           .from('users')
           .select()
           .eq('username', username)
           .maybeSingle();
 
-      if (response == null) return null;
+      if (userResponse != null) {
+        return UserModel.fromJson(userResponse);
+      }
 
-      return UserModel.fromJson(response);
+      // 2. If not found, try finding in 'super_admins' table
+      final superAdminResponse = await _client
+          .from('super_admins')
+          .select()
+          .eq('username', username)
+          .maybeSingle();
+
+      if (superAdminResponse != null) {
+        // Construct UserModel from SuperAdmin data
+        return UserModel(
+          id: superAdminResponse['id'],
+          username: superAdminResponse['username'],
+          nama: superAdminResponse['nama'],
+          isAdmin: true,
+          adminLevel: 0, // Super Admin Level
+          // Super Admin can switch daerah, so initially null or handle in UI
+        );
+      }
+
+      return null;
     } catch (e) {
-      print('Error fetching user: $e');
+      debugPrint('Error fetching user: $e');
       return null;
     }
   }

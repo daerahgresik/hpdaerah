@@ -1,4 +1,4 @@
-class Organization {
+﻿class Organization {
   final String id;
   final String name;
   final String? type;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/presensi_model.dart';
-import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -17,7 +16,6 @@ class PengajianDetailPage extends StatefulWidget {
 
 class _PengajianDetailPageState extends State<PengajianDetailPage> {
   final _presensiService = PresensiService();
-  final bool _isScanning = false;
 
   void _openScanner() async {
     final status = await Permission.camera.request();
@@ -130,7 +128,7 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),

@@ -1,4 +1,4 @@
-class Presensi {
+﻿class Presensi {
   final String? id;
   final String pengajianId;
   final String userId;

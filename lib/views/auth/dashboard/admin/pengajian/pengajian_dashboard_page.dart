@@ -4,7 +4,6 @@ import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_search_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_selector.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_page.dart';
@@ -374,7 +373,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
                 leading: CircleAvatar(
-                  backgroundColor: const Color(0xFF1A5F2D).withOpacity(0.1),
+                  backgroundColor: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
                   child: const Icon(Icons.mosque, color: Color(0xFF1A5F2D)),
                 ),
                 title: Text(
@@ -524,7 +523,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     bool isActive = false,
   }) {
     return Material(
-      color: isActive ? color.withOpacity(0.1) : Colors.white,
+      color: isActive ? color.withValues(alpha: 0.1) : Colors.white,
       borderRadius: BorderRadius.circular(20),
       elevation: isActive ? 0 : 4,
       shadowColor: Colors.black12,
@@ -545,7 +544,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isActive ? Colors.white : color.withOpacity(0.1),
+                  color: isActive ? Colors.white : color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, size: 28, color: color),
@@ -576,10 +575,10 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1A5F2D).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF1A5F2D).withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

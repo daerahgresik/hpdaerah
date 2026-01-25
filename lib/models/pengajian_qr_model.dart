@@ -1,4 +1,4 @@
-/// Model untuk QR Code Pengajian
+﻿/// Model untuk QR Code Pengajian
 /// QR Code bersifat unik per user per pengajian dan sekali pakai
 class PengajianQr {
   final String id;

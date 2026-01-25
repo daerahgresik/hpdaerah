@@ -1,4 +1,4 @@
-class Pengajian {
+﻿class Pengajian {
   final String id;
   final String orgId;
   final String title;

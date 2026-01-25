@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/presensi_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:hpdaerah/models/user_model.dart';
@@ -16,7 +16,6 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _pengajianList = [];
   String? _selectedPengajianId;
-  final bool _isLoading = false;
 
   @override
   void initState() {
@@ -196,7 +195,7 @@ class _PresensiUserTile extends StatelessWidget {
           ),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: const Color(0xFF1A5F2D).withOpacity(0.1),
+              backgroundColor: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
               backgroundImage: user?.fotoProfil != null
                   ? NetworkImage(user!.fotoProfil!)
                   : null,

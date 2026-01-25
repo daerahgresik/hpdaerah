@@ -1,4 +1,4 @@
-/// Model class untuk User sesuai database schema (01_users.sql)
+﻿/// Model class untuk User sesuai database schema (01_users.sql)
 class UserModel {
   final String? id;
   final String username;

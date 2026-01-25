@@ -32,23 +32,33 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _isLoading = true);
 
       try {
-        // Query users table for matching username and plain password
-        final response = await Supabase.instance.client
+        // 1. Try 'users' table
+        var response = await Supabase.instance.client
             .from('users')
             .select()
             .eq('username', _usernameController.text.trim())
-            .eq('password', _passwordController.text) // Plain text check
+            .eq('password', _passwordController.text)
+            .maybeSingle();
+
+        // 2. If valid user not found, try 'super_admins'
+        response ??= await Supabase.instance.client
+            .from('super_admins')
+            .select()
+            .eq('username', _usernameController.text.trim())
+            .eq('password', _passwordController.text)
             .maybeSingle();
 
         if (mounted) setState(() => _isLoading = false);
 
         if (response != null) {
-          // Login Success - Save username to SharedPreferences
+          // Login Success
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(
             'logged_in_username',
             _usernameController.text.trim(),
           );
+
+          if (!mounted) return;
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -142,7 +152,10 @@ class _LoginPageState extends State<LoginPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [Colors.white.withOpacity(0.12), Colors.transparent],
+                  colors: [
+                    Colors.white.withValues(alpha: 0.12),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -156,7 +169,10 @@ class _LoginPageState extends State<LoginPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [Colors.teal.withOpacity(0.15), Colors.transparent],
+                  colors: [
+                    Colors.teal.withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -178,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                       icon: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -218,7 +234,7 @@ class _LoginPageState extends State<LoginPage> {
                     'Masuk ke akun Anda',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
 
@@ -232,10 +248,10 @@ class _LoginPageState extends State<LoginPage> {
                       child: Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Form(
@@ -250,16 +266,18 @@ class _LoginPageState extends State<LoginPage> {
                                 decoration: InputDecoration(
                                   labelText: 'Username',
                                   labelStyle: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                   ),
                                   prefixIcon: Icon(
                                     Icons.person_outline,
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Colors.white.withValues(alpha: 0.7),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
@@ -283,7 +301,9 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   ),
                                   filled: true,
-                                  fillColor: Colors.white.withOpacity(0.05),
+                                  fillColor: Colors.white.withValues(
+                                    alpha: 0.05,
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -303,18 +323,20 @@ class _LoginPageState extends State<LoginPage> {
                                 decoration: InputDecoration(
                                   labelText: 'Password',
                                   labelStyle: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                   ),
                                   prefixIcon: Icon(
                                     Icons.lock_outline,
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Colors.white.withValues(alpha: 0.7),
                                   ),
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       _obscurePassword
                                           ? Icons.visibility_off
                                           : Icons.visibility,
-                                      color: Colors.white.withOpacity(0.7),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.7,
+                                      ),
                                     ),
                                     onPressed: () => setState(
                                       () =>
@@ -324,7 +346,9 @@ class _LoginPageState extends State<LoginPage> {
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(16),
                                     borderSide: BorderSide(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
@@ -348,7 +372,9 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   ),
                                   filled: true,
-                                  fillColor: Colors.white.withOpacity(0.05),
+                                  fillColor: Colors.white.withValues(
+                                    alpha: 0.05,
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -368,12 +394,29 @@ class _LoginPageState extends State<LoginPage> {
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
                                   onPressed: () {
-                                    // TODO: Forgot password
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Lupa Password'),
+                                        content: const Text(
+                                          'Untuk mereset password, silakan hubungi Admin atau Pengurus setempat.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('Tutup'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                   },
                                   child: Text(
                                     'Lupa Password?',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.8,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -428,7 +471,9 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Text(
                         'Belum punya akun? ',
-                        style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
                       ),
                       GestureDetector(
                         onTap: () {

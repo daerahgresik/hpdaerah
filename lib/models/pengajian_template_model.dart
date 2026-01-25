@@ -1,4 +1,4 @@
-class PengajianTemplate {
+﻿class PengajianTemplate {
   final String id;
   final String orgId;
   final String level; // daerah, desa, kelompok

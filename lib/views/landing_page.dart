@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:hpdaerah/views/auth/login_page.dart';
 import 'package:hpdaerah/views/auth/register_page.dart';
@@ -57,8 +57,8 @@ class _HalamanDepanState extends State<HalamanDepan> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    Colors.white.withOpacity(0.15),
-                    Colors.white.withOpacity(0.05),
+                    Colors.white.withValues(alpha: 0.15),
+                    Colors.white.withValues(alpha: 0.05),
                     Colors.transparent,
                   ],
                 ),
@@ -75,8 +75,8 @@ class _HalamanDepanState extends State<HalamanDepan> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    Colors.teal.withOpacity(0.2),
-                    Colors.teal.withOpacity(0.05),
+                    Colors.teal.withValues(alpha: 0.2),
+                    Colors.teal.withValues(alpha: 0.05),
                     Colors.transparent,
                   ],
                 ),
@@ -92,7 +92,10 @@ class _HalamanDepanState extends State<HalamanDepan> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [Colors.lime.withOpacity(0.15), Colors.transparent],
+                  colors: [
+                    Colors.lime.withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -144,7 +147,7 @@ class _HalamanDepanState extends State<HalamanDepan> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withValues(alpha: 0.85),
                       height: 1.6,
                       letterSpacing: 0.5,
                     ),
@@ -163,14 +166,14 @@ class _HalamanDepanState extends State<HalamanDepan> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.white.withOpacity(0.95),
-                              Colors.white.withOpacity(0.85),
+                              Colors.white.withValues(alpha: 0.95),
+                              Colors.white.withValues(alpha: 0.85),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
+                              color: Colors.black.withValues(alpha: 0.15),
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
@@ -224,10 +227,10 @@ class _HalamanDepanState extends State<HalamanDepan> {
                         width: double.infinity,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             width: 1.5,
                           ),
                         ),
@@ -277,14 +280,14 @@ class _HalamanDepanState extends State<HalamanDepan> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       '© 2026 Daerah Gresik',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         letterSpacing: 0.5,
                       ),
                     ),

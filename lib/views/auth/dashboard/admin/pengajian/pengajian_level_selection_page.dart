@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_template_model.dart';
+import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_template_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_form_page.dart';
 
@@ -84,7 +85,7 @@ class _PengajianLevelPageState extends State<PengajianLevelPage> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 20),
@@ -95,7 +96,7 @@ class _PengajianLevelPageState extends State<PengajianLevelPage> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: color.withOpacity(0.8),
+                color: color.withValues(alpha: 0.8),
                 letterSpacing: 1.2,
               ),
             ),
@@ -138,10 +139,10 @@ class _PengajianLevelPageState extends State<PengajianLevelPage> {
                   color: Colors.amber,
                 ),
                 label: Text(t.name),
-                backgroundColor: color.withOpacity(0.05),
+                backgroundColor: color.withValues(alpha: 0.05),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: color.withOpacity(0.2)),
+                  side: BorderSide(color: color.withValues(alpha: 0.2)),
                 ),
                 onPressed: () => _navigateToForm(context, template: t),
               );
@@ -192,10 +193,16 @@ class _PengajianLevelPageState extends State<PengajianLevelPage> {
         builder: (_) => PengajianFormPage(
           orgId: widget.orgId,
           scope: template?.level ?? level, // Level
-          // TODO: Pass pre-filled data (title, desc) to Form
-          // But Form needs adjustment to accept these.
-          // For now, let's stick to scope passing.
-          // We will modify form next to accept 'initialData'.
+          template: template != null
+              ? Pengajian(
+                  id: '',
+                  orgId: widget.orgId,
+                  title: template.defaultTitle,
+                  description: template.defaultDescription,
+                  location: template.defaultLocation,
+                  startedAt: DateTime.now(),
+                )
+              : null,
         ),
       ),
     );

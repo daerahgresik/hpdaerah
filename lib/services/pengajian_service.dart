@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/pengajian_model.dart';
 
@@ -75,6 +75,29 @@ class PengajianService {
       debugPrint("Success Create Template: ${template.templateName}");
     } catch (e) {
       debugPrint("Error Create Template: $e");
+      rethrow;
+    }
+  }
+
+  // UPDATE TEMPLATE
+  Future<void> updateTemplate(Pengajian template) async {
+    try {
+      if (template.id.isEmpty) {
+        throw Exception("Template ID is required for update");
+      }
+
+      final data = {
+        'title': template.title,
+        'description': template.description,
+        'location': template.location,
+        'target_audience': template.targetAudience,
+        'template_name': template.templateName,
+      };
+
+      await _client.from('pengajian').update(data).eq('id', template.id);
+      debugPrint("Success Update Template: ${template.templateName}");
+    } catch (e) {
+      debugPrint("Error Update Template: $e");
       rethrow;
     }
   }

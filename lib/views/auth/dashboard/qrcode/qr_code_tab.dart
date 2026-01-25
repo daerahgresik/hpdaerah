@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
@@ -224,7 +224,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -298,10 +298,10 @@ class _QrCodeTabState extends State<QrCodeTab> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A5F2D).withOpacity(0.05),
+            color: const Color(0xFF1A5F2D).withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: const Color(0xFF1A5F2D).withOpacity(0.1),
+              color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
               width: 2,
             ),
           ),
@@ -310,7 +310,14 @@ class _QrCodeTabState extends State<QrCodeTab> {
             version: QrVersions.auto,
             size: 200.0,
             backgroundColor: Colors.transparent,
-            foregroundColor: const Color(0xFF1A5F2D),
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: Color(0xFF1A5F2D),
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: Color(0xFF1A5F2D),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -436,7 +443,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
+            color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 18, color: iconColor),

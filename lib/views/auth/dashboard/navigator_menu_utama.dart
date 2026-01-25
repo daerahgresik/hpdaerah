@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/utils/menu_helper.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/admin_navigator_header.dart';
@@ -72,7 +72,9 @@ class _AdminTabState extends State<AdminTab> {
           ),
 
           // Check if Super Admin needs to select daerah first
-          if (widget.user.isSuperAdmin && _selectedDaerahId == null)
+          if (widget.user.isSuperAdmin &&
+              _selectedDaerahId == null &&
+              _selectedAdminRoute != '/admin/organisasi')
             Expanded(child: _buildSelectDaerahPrompt())
           else
             // Main Content Area
