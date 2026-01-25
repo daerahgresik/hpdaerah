@@ -53,7 +53,7 @@ class RegisterController {
     required String? noWa, // New Parameter
   }) async {
     try {
-      // 1. Determine Organization ID
+      // 1. Determine Organization ID (Lowest Level)
       final determinedOrgId =
           selectedKelas ?? selectedKelompok ?? selectedDesa ?? selectedDaerah;
 
@@ -63,7 +63,7 @@ class RegisterController {
         fotoUrl = await _uploadAvatar(fotoProfilFile);
       }
 
-      // 3. Create User Model
+      // 3. Create User Model (With Hierarchy)
       final userModel = UserModel(
         username: username,
         nama: nama,
@@ -76,7 +76,12 @@ class RegisterController {
         keterangan: null,
         fotoProfil: fotoUrl,
         currentOrgId: determinedOrgId,
-        noWa: noWa, // Add noWa
+        noWa: noWa,
+        // Save Hierarchy Explicitly
+        orgDaerahId: selectedDaerah,
+        orgDesaId: selectedDesa,
+        orgKelompokId: selectedKelompok,
+        orgKategoriId: selectedKelas,
       );
 
       // 4. Insert into 'users' table
@@ -88,11 +93,11 @@ class RegisterController {
 
       final userId = response['id'];
 
-      // 5. Insert into 'user_organizations' (Link to Kelas/Level 3)
-      if (selectedKelas != null) {
+      // 5. Insert into 'user_organizations' (Link to Lowest Level)
+      if (determinedOrgId != null) {
         await _client.from('user_organizations').insert({
           'user_id': userId,
-          'org_id': selectedKelas,
+          'org_id': determinedOrgId,
           'role': 'member',
         });
       }

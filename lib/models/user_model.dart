@@ -17,11 +17,17 @@ class UserModel {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  // New Fields
+  // Additional Profile Fields
   final String? statusWarga;
   final String? keperluan;
   final String? detailKeperluan;
-  final String? noWa; // Nomor WhatsApp
+  final String? noWa;
+
+  // Organization Hierarchy Fields (Denormalized)
+  final String? orgDaerahId;
+  final String? orgDesaId;
+  final String? orgKelompokId;
+  final String? orgKategoriId;
 
   UserModel({
     this.id,
@@ -44,6 +50,10 @@ class UserModel {
     this.keperluan,
     this.detailKeperluan,
     this.noWa,
+    this.orgDaerahId,
+    this.orgDesaId,
+    this.orgKelompokId,
+    this.orgKategoriId,
   });
 
   /// Check if user is Super Admin (can manage everything)
@@ -114,6 +124,10 @@ class UserModel {
       keperluan: json['keperluan'],
       detailKeperluan: json['detail_keperluan'],
       noWa: json['no_wa'],
+      orgDaerahId: json['org_daerah_id'],
+      orgDesaId: json['org_desa_id'],
+      orgKelompokId: json['org_kelompok_id'],
+      orgKategoriId: json['org_kategori_id'],
     );
   }
 
@@ -138,6 +152,10 @@ class UserModel {
       'keperluan': keperluan,
       'detail_keperluan': detailKeperluan,
       'no_wa': noWa,
+      'org_daerah_id': orgDaerahId,
+      'org_desa_id': orgDesaId,
+      'org_kelompok_id': orgKelompokId,
+      'org_kategori_id': orgKategoriId,
     };
   }
 
@@ -163,6 +181,10 @@ class UserModel {
     String? keperluan,
     String? detailKeperluan,
     String? noWa,
+    String? orgDaerahId,
+    String? orgDesaId,
+    String? orgKelompokId,
+    String? orgKategoriId,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -185,12 +207,16 @@ class UserModel {
       keperluan: keperluan ?? this.keperluan,
       detailKeperluan: detailKeperluan ?? this.detailKeperluan,
       noWa: noWa ?? this.noWa,
+      orgDaerahId: orgDaerahId ?? this.orgDaerahId,
+      orgDesaId: orgDesaId ?? this.orgDesaId,
+      orgKelompokId: orgKelompokId ?? this.orgKelompokId,
+      orgKategoriId: orgKategoriId ?? this.orgKategoriId,
     );
   }
 
   @override
   String toString() {
-    return 'UserModel(id: $id, username: $username, nama: $nama, isAdmin: $isAdmin, adminLevel: $adminLevel, adminOrgId: $adminOrgId)';
+    return 'UserModel(id: $id, username: $username, nama: $nama, isAdmin: $isAdmin)';
   }
 }
 

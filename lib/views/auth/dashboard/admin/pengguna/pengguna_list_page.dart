@@ -578,6 +578,34 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           ),
                         ),
 
+                        const SizedBox(height: 16),
+
+                        // USER INFO BADGES (NEW)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (user['status_warga'] != null)
+                              _buildInfoBadge(
+                                user['status_warga'],
+                                Icons.verified_user,
+                                Colors.blue,
+                              ),
+                            if (user['keperluan'] != null)
+                              _buildInfoBadge(
+                                user['keperluan'],
+                                Icons.school,
+                                Colors.orange,
+                              ),
+                            if (user['no_wa'] != null)
+                              _buildInfoBadge(
+                                user['no_wa'],
+                                Icons.chat,
+                                Colors.green,
+                              ),
+                          ],
+                        ),
+
                         const SizedBox(height: 20),
 
                         // Current Status Info
@@ -1618,6 +1646,56 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                             fontSize: 13,
                           ),
                         ),
+                        // BADGES FOR USER DETAILS (NEW)
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            if (user['status_warga'] != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue[100]!),
+                                ),
+                                child: Text(
+                                  user['status_warga'],
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.blue[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            if (user['keperluan'] != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.orange[100]!,
+                                  ),
+                                ),
+                                child: Text(
+                                  user['keperluan'],
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.orange[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         if (isAdmin) ...[
                           const SizedBox(height: 10),
                           Wrap(
@@ -1790,6 +1868,32 @@ class _PenggunaListPageState extends State<PenggunaListPage>
             style: TextStyle(
               color: value == 'delete' ? color : Colors.black87,
               fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoBadge(String text, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
