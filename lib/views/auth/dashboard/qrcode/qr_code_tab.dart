@@ -7,11 +7,7 @@ import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// QR Code Tab - Menampilkan QR Code berbasis pengajian
-/// 3 State:
-/// 1. Tidak ada pengajian aktif
-/// 2. Ada QR aktif (belum dipakai)
-/// 3. Sudah presensi (QR sudah dipakai)
+/// Smart QR Code Tab - Organized by status
 class QrCodeTab extends StatefulWidget {
   final UserModel user;
   const QrCodeTab({super.key, required this.user});
@@ -20,15 +16,31 @@ class QrCodeTab extends StatefulWidget {
   State<QrCodeTab> createState() => _QrCodeTabState();
 }
 
-class _QrCodeTabState extends State<QrCodeTab> {
+class _QrCodeTabState extends State<QrCodeTab>
+    with SingleTickerProviderStateMixin {
   final _qrService = PengajianQrService();
   final _presensiService = PresensiService();
-  int _currentIndex = 0;
+  late TabController _tabController;
+  late Stream<List<PengajianQr>> _qrStream;
   bool _isSubmittingIzin = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _initStream();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _initStream() {
+    if (widget.user.id != null) {
+      _qrStream = _qrService.streamActiveQrForUser(widget.user.id!);
+    }
   }
 
   @override
@@ -39,8 +51,35 @@ class _QrCodeTabState extends State<QrCodeTab> {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        elevation: 0,
+        backgroundColor: const Color(0xFF1A5F2D),
+        foregroundColor: Colors.white,
+        title: const Text(
+          'QR Code Pengajian',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          dividerColor: Colors.transparent,
+          tabs: const [
+            Tab(text: 'Aktif', icon: Icon(Icons.qr_code_2, size: 20)),
+            Tab(text: 'Hadir', icon: Icon(Icons.check_circle, size: 20)),
+            Tab(text: 'Izin', icon: Icon(Icons.event_busy, size: 20)),
+          ],
+        ),
+      ),
       body: StreamBuilder<List<PengajianQr>>(
-        stream: _qrService.streamActiveQrForUser(widget.user.id!),
+        stream: _qrStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -52,29 +91,379 @@ class _QrCodeTabState extends State<QrCodeTab> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final list = snapshot.data ?? [];
+          final allQr = snapshot.data ?? [];
 
-          if (list.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async => setState(() {}),
-              color: const Color(0xFF1A5F2D),
-              child: _buildNoQrState(),
-            );
-          }
+          // Categorize QR codes
+          final aktif = allQr.where((q) => !q.isUsed).toList();
+          final hadir = allQr
+              .where((q) => q.isUsed && q.presensiStatus == 'hadir')
+              .toList();
+          final izin = allQr
+              .where((q) => q.isUsed && q.presensiStatus == 'izin')
+              .toList();
 
-          return RefreshIndicator(
-            onRefresh: () async => setState(() {}),
-            color: const Color(0xFF1A5F2D),
-            child: _buildQrCardView(list),
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _buildAktifTab(aktif),
+              _buildHadirTab(hadir),
+              _buildIzinTab(izin),
+            ],
           );
         },
       ),
     );
   }
 
+  // ============================================================================
+  // TAB 1: AKTIF - QR yang belum di-scan
+  // ============================================================================
+  Widget _buildAktifTab(List<PengajianQr> aktifList) {
+    if (aktifList.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.qr_code_scanner,
+        title: 'Tidak Ada QR Aktif',
+        subtitle:
+            'Semua pengajian sudah Anda hadiri atau belum ada pengajian baru',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: aktifList.length,
+        itemBuilder: (context, index) {
+          final qr = aktifList[index];
+          return _buildQrCard(qr, isActive: true);
+        },
+      ),
+    );
+  }
+
+  // ============================================================================
+  // TAB 2: HADIR - QR yang sudah di-scan dengan status hadir
+  // ============================================================================
+  Widget _buildHadirTab(List<PengajianQr> hadirList) {
+    if (hadirList.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.event_available,
+        title: 'Belum Ada Kehadiran',
+        subtitle: 'Scan QR Code untuk menandai kehadiran Anda',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: hadirList.length,
+        itemBuilder: (context, index) {
+          final qr = hadirList[index];
+          return _buildCompletedCard(qr, status: 'hadir');
+        },
+      ),
+    );
+  }
+
+  // ============================================================================
+  // TAB 3: IZIN - QR dengan status izin
+  // ============================================================================
+  Widget _buildIzinTab(List<PengajianQr> izinList) {
+    if (izinList.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.assignment_turned_in,
+        title: 'Tidak Ada Izin',
+        subtitle: 'Anda belum pernah mengajukan izin',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async => setState(() {}),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: izinList.length,
+        itemBuilder: (context, index) {
+          final qr = izinList[index];
+          return _buildCompletedCard(qr, status: 'izin');
+        },
+      ),
+    );
+  }
+
+  // ============================================================================
+  // CARD BUILDERS
+  // ============================================================================
+  Widget _buildQrCard(PengajianQr qr, {required bool isActive}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF1A5F2D), const Color(0xFF2E7D42)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.event,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            qr.pengajianTitle ?? 'Pengajian',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (qr.pengajianLocation != null)
+                            Text(
+                              '📍 ${qr.pengajianLocation}',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (qr.pengajianStartedAt != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _formatDateTime(qr.pengajianStartedAt!),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // QR Code
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200, width: 2),
+              ),
+              child: QrImageView(
+                data: qr.qrCode,
+                version: QrVersions.auto,
+                size: 200,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+
+          // QR Code Text
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              qr.qrCode,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[600],
+                fontFamily: 'monospace',
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+
+          // Action Buttons
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isSubmittingIzin ? null : () => _ajukanIzin(qr),
+                    icon: _isSubmittingIzin
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.event_busy, size: 18),
+                    label: Text(
+                      _isSubmittingIzin ? 'Mengirim...' : 'Ajukan Izin',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange,
+                      side: const BorderSide(color: Colors.orange),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedCard(PengajianQr qr, {required String status}) {
+    final isHadir = status == 'hadir';
+    final color = isHadir ? Colors.green : Colors.orange;
+    final icon = isHadir ? Icons.check_circle : Icons.event_busy;
+    final label = isHadir ? 'Hadir' : 'Izin';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  qr.pengajianTitle ?? 'Pengajian',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                if (qr.pengajianStartedAt != null)
+                  Text(
+                    _formatDateTime(qr.pengajianStartedAt!),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 60, color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // IZIN SUBMISSION
+  // ============================================================================
   void _ajukanIzin(PengajianQr qr) async {
     final picker = ImagePicker();
-    // Live camera only - no source selection allowed
     final XFile? photo = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 50,
@@ -82,13 +471,11 @@ class _QrCodeTabState extends State<QrCodeTab> {
     );
 
     if (photo == null) return;
-
     if (!mounted) return;
 
     final keteranganCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    // Show dialog for mandatory description
     final bool? confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -175,509 +562,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
     }
   }
 
-  /// State: Tidak ada pengajian aktif
-  Widget _buildNoQrState() {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height - 200,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.qr_code_2,
-                    size: 80,
-                    color: Colors.grey[400],
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  'Tidak Ada Pengajian',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Saat ini Anda tidak memiliki tugas pengajian yang harus dihadiri.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey[500],
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue[100]!),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 18,
-                        color: Colors.blue[700],
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Hubungi admin jika ada pertanyaan',
-                        style: TextStyle(color: Colors.blue[700], fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// State: Ada QR aktif
-  Widget _buildQrCardView(List<PengajianQr> activeQrList) {
-    return Column(
-      children: [
-        // Header dengan counter
-        if (activeQrList.length > 1)
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.swipe, size: 16, color: Colors.grey[500]),
-                const SizedBox(width: 8),
-                Text(
-                  'Geser untuk melihat pengajian lainnya',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-
-        // Dots indicator
-        if (activeQrList.length > 1)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(activeQrList.length, (index) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: _currentIndex == index ? 24 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _currentIndex == index
-                      ? const Color(0xFF1A5F2D)
-                      : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              );
-            }),
-          ),
-
-        // PageView dengan QR Cards
-        Expanded(
-          child: PageView.builder(
-            itemCount: activeQrList.length,
-            onPageChanged: (index) {
-              setState(() => _currentIndex = index);
-            },
-            itemBuilder: (context, index) {
-              return _buildQrCard(activeQrList[index]);
-            },
-          ),
-        ),
-        const SizedBox(height: 80), // Space for bottom nav
-      ],
-    );
-  }
-
-  /// QR Card untuk satu pengajian
-  Widget _buildQrCard(PengajianQr qr) {
-    final isUsed = qr.isUsed;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Main Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Status Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isUsed ? Colors.green[50] : Colors.orange[50],
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isUsed ? Colors.green[200]! : Colors.orange[200]!,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isUsed ? Icons.check_circle : Icons.pending,
-                        size: 18,
-                        color: isUsed ? Colors.green[700] : Colors.orange[700],
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isUsed ? 'PRESENSI BERHASIL' : 'MENUNGGU PRESENSI',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isUsed
-                              ? Colors.green[700]
-                              : Colors.orange[700],
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // QR Code atau Success Message
-                if (isUsed) _buildSuccessState(qr) else _buildQrCodeDisplay(qr),
-
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-
-                // Pengajian Info
-                _buildPengajianInfo(qr),
-              ],
-            ),
-          ),
-
-          // Warning / Info Box
-          if (!isUsed) ...[
-            const SizedBox(height: 16),
-            _buildWarningBox(),
-            const SizedBox(height: 24),
-            // Leave Request Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isSubmittingIzin ? null : () => _ajukanIzin(qr),
-                icon: _isSubmittingIzin
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.assignment_late_outlined),
-                label: Text(_isSubmittingIzin ? 'Mengirim...' : 'Ajukan Izin'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange[700],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 2,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// QR Code Display (belum dipakai)
-  Widget _buildQrCodeDisplay(PengajianQr qr) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A5F2D).withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
-              width: 2,
-            ),
-          ),
-          child: QrImageView(
-            data: qr.qrCode,
-            version: QrVersions.auto,
-            size: 200.0,
-            backgroundColor: Colors.transparent,
-            eyeStyle: const QrEyeStyle(
-              eyeShape: QrEyeShape.square,
-              color: Color(0xFF1A5F2D),
-            ),
-            dataModuleStyle: const QrDataModuleStyle(
-              dataModuleShape: QrDataModuleShape.square,
-              color: Color(0xFF1A5F2D),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            'Kode Unik Anda',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[600],
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Success State (sudah presensi / izin)
-  Widget _buildSuccessState(PengajianQr qr) {
-    final isIzin = qr.presensiStatus == 'izin';
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: isIzin ? Colors.orange[50] : Colors.green[50],
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            isIzin ? Icons.assignment_turned_in : Icons.check_circle,
-            size: 80,
-            color: isIzin ? Colors.orange[600] : Colors.green[600],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          isIzin ? 'Izin Telah Dicatat' : 'Anda Telah Hadir!',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: isIzin ? Colors.orange[700] : Colors.green[700],
-          ),
-        ),
-        if (qr.usedAt != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            isIzin
-                ? 'Diajukan pada: ${_formatTime(qr.usedAt!)}'
-                : 'Hadir pada: ${_formatTime(qr.usedAt!)}',
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: BoxDecoration(
-            color: isIzin ? Colors.orange[100] : Colors.green[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            isIzin
-                ? 'Keterangan izin telah terkirim ke Admin.'
-                : '🎉 Semoga berkah dan bermanfaat!',
-            style: TextStyle(
-              fontSize: 14,
-              color: isIzin ? Colors.orange[800] : Colors.green[800],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Info Pengajian
-  Widget _buildPengajianInfo(PengajianQr qr) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          qr.pengajianTitle ?? 'Pengajian',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1A5F2D),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        _buildInfoRow(
-          Icons.location_on,
-          qr.pengajianLocation ?? 'Lokasi tidak ditentukan',
-          Colors.red[400]!,
-        ),
-        const SizedBox(height: 12),
-
-        _buildInfoRow(
-          Icons.calendar_today,
-          qr.pengajianStartedAt != null
-              ? _formatDateTime(qr.pengajianStartedAt!)
-              : 'Waktu tidak ditentukan',
-          Colors.blue[400]!,
-        ),
-        const SizedBox(height: 12),
-
-        _buildInfoRow(
-          Icons.groups,
-          'Target: ${qr.targetAudience ?? 'Semua'}',
-          Colors.orange[400]!,
-        ),
-
-        if (qr.pengajianDescription != null &&
-            qr.pengajianDescription!.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(
-            qr.pengajianDescription!,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-              height: 1.5,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text, Color iconColor) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 18, color: iconColor),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Warning Box
-  Widget _buildWarningBox() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.amber[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber[200]!),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.warning_amber_rounded,
-                color: Colors.amber[700],
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Perhatian',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber[800],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildWarningItem('Tunjukkan QR ini ke Admin saat hadir'),
-          const SizedBox(height: 8),
-          _buildWarningItem('QR hanya bisa digunakan SEKALI'),
-          const SizedBox(height: 8),
-          _buildWarningItem('Jangan bagikan QR ini ke orang lain'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWarningItem(String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('• ', style: TextStyle(color: Colors.amber[700], fontSize: 14)),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.amber[800],
-              height: 1.4,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   String _formatDateTime(DateTime dt) {
-    final days = [
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-      'Minggu',
-    ];
     final months = [
       'Jan',
       'Feb',
@@ -686,16 +571,14 @@ class _QrCodeTabState extends State<QrCodeTab> {
       'Mei',
       'Jun',
       'Jul',
-      'Agu',
+      'Ags',
       'Sep',
       'Okt',
       'Nov',
       'Des',
     ];
-    return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year} • ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB';
-  }
-
-  String _formatTime(DateTime dt) {
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WIB';
+    final time =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year} • $time';
   }
 }

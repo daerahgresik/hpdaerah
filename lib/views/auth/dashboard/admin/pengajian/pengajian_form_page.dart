@@ -1,14 +1,17 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
 
 class PengajianFormPage extends StatefulWidget {
+  final UserModel user;
   final String orgId;
   final String? scope; // Daerah, Desa, atau Kelompok
   final Pengajian? template; // Template data (jika dari Menu Cepat)
 
   const PengajianFormPage({
     super.key,
+    required this.user,
     required this.orgId,
     this.scope,
     this.template,
@@ -23,6 +26,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
   late TextEditingController _namaController;
   late TextEditingController _lokasiController;
   late TextEditingController _deskripsiController;
+  late TextEditingController _roomCodeController;
   final _service = PengajianService();
 
   DateTime? _selectedDate;
@@ -43,6 +47,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
           widget.template?.description ??
           (widget.scope != null ? "Pengajian Tingkat ${widget.scope}" : ""),
     );
+    _roomCodeController = TextEditingController();
     _selectedTarget = widget.template?.targetAudience;
   }
 
@@ -51,6 +56,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
     _namaController.dispose();
     _lokasiController.dispose();
     _deskripsiController.dispose();
+    _roomCodeController.dispose();
     super.dispose();
   }
 
@@ -115,7 +121,12 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
         location: _lokasiController.text,
         description: _deskripsiController.text,
         targetAudience: _selectedTarget,
+        roomCode: _roomCodeController.text.trim().toUpperCase(),
         startedAt: startedAt,
+        // Full hierarchical context
+        orgDaerahId: widget.user.orgDaerahId,
+        orgDesaId: widget.user.orgDesaId,
+        orgKelompokId: widget.user.orgKelompokId,
       );
 
       await _service.createPengajian(newPengajian);
@@ -305,6 +316,27 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
                 controller: _deskripsiController,
                 maxLines: 3,
                 decoration: _inputDecoration('Keterangan tambahan...'),
+              ),
+              const SizedBox(height: 20),
+
+              // KODE ROOM
+              _buildLabel('Kode Room (Opsional)'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _roomCodeController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: _inputDecoration(
+                  'Contoh: ABCDE1 (Kosongkan utk acak)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "* Bagikan kode ini ke Admin lain agar mereka bisa bergabung.",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.blueGrey,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
               const SizedBox(height: 32),
 

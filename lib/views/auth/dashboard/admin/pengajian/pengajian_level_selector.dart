@@ -1,15 +1,18 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/models/materi_model.dart';
 import 'package:hpdaerah/services/materi_service.dart';
 
 class PengajianLevelSelector extends StatefulWidget {
+  final UserModel user;
   final String orgId;
   final int adminLevel;
 
   const PengajianLevelSelector({
     super.key,
+    required this.user,
     required this.orgId,
     required this.adminLevel,
   });
@@ -45,6 +48,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
     if (level.toLowerCase() == 'daerah') return 0;
     if (level.toLowerCase() == 'desa') return 1;
     if (level.toLowerCase() == 'kelompok') return 2;
+    if (level.toLowerCase() == 'kategori') return 3;
     return 0; // Default
   }
 
@@ -66,7 +70,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
         return Column(
           children: [
-            if (widget.adminLevel == 0 || widget.adminLevel == 1)
+            // 1. DAERAH (Hanya muncul untuk Super Admin dan Admin Daerah)
+            if (widget.adminLevel <= 1) ...[
               _buildSection(
                 context,
                 title: 'DAERAH',
@@ -75,10 +80,11 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 icon: Icons.flag,
                 templates: templates,
               ),
-            if (widget.adminLevel == 0 || widget.adminLevel == 1)
               const SizedBox(height: 24),
+            ],
 
-            if (widget.adminLevel == 0 || widget.adminLevel == 2)
+            // 2. DESA (Muncul untuk Super, Daerah, dan Admin Desa itu sendiri)
+            if (widget.adminLevel <= 2) ...[
               _buildSection(
                 context,
                 title: 'DESA',
@@ -87,10 +93,11 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 icon: Icons.home_work,
                 templates: templates,
               ),
-            if (widget.adminLevel == 0 || widget.adminLevel == 2)
               const SizedBox(height: 24),
+            ],
 
-            if (widget.adminLevel == 0 || widget.adminLevel == 3)
+            // 3. KELOMPOK (Muncul untuk level 0, 1, 2, dan 3)
+            if (widget.adminLevel <= 3) ...[
               _buildSection(
                 context,
                 title: 'KELOMPOK',
@@ -99,6 +106,18 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 icon: Icons.groups,
                 templates: templates,
               ),
+              const SizedBox(height: 24),
+            ],
+
+            // 4. KATEGORI (Muncul untuk semua level admin)
+            _buildSection(
+              context,
+              title: 'KATEGORI / KELAS',
+              level: 'Kategori',
+              color: Colors.orange,
+              icon: Icons.school,
+              templates: templates,
+            ),
           ],
         );
       },
@@ -287,8 +306,11 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
       DateTime.now().add(const Duration(hours: 1)),
     );
 
-    final guruController = TextEditingController();
-    final isiMateriController = TextEditingController();
+    // Dynamic lists for Guru & Materi
+    final List<Map<String, TextEditingController>> materiEntries = [
+      {'guru': TextEditingController(), 'isi': TextEditingController()},
+    ];
+    final roomCodeController = TextEditingController(text: template.roomCode);
 
     await showDialog(
       context: context,
@@ -407,31 +429,141 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                   const Divider(),
                   const SizedBox(height: 8),
 
-                  // INPUT MATERI
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+
+                  // INPUT MATERI (DYNAMIC LIST)
+                  Row(
+                    children: [
+                      const Text(
+                        "Input Materi / Nasehat:",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () {
+                          setStateDialog(() {
+                            materiEntries.add({
+                              'guru': TextEditingController(),
+                              'isi': TextEditingController(),
+                            });
+                          });
+                        },
+                        icon: const Icon(Icons.add_circle_outline, size: 20),
+                        label: const Text("Tambah Guru"),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF1A5F2D),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  ...List.generate(materiEntries.length, (index) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                "Materi #${index + 1}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Colors.blueGrey,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (materiEntries.length > 1)
+                                IconButton(
+                                  onPressed: () {
+                                    setStateDialog(() {
+                                      materiEntries[index]['guru']!.dispose();
+                                      materiEntries[index]['isi']!.dispose();
+                                      materiEntries.removeAt(index);
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: materiEntries[index]['guru'],
+                            decoration: const InputDecoration(
+                              labelText: 'Pembawa Materi / Guru',
+                              hintText: 'Nama Guru',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: materiEntries[index]['isi'],
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText: 'Kesimpulan Materi',
+                              hintText: 'Tulis ringkasan materi di sini...',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              filled: true,
+                              fillColor: Colors.white,
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  // KODE ROOM
                   const Text(
-                    "Input Materi (Opsional):",
+                    "Kode Room (Opsional):",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   TextField(
-                    controller: guruController,
+                    controller: roomCodeController,
+                    textCapitalization: TextCapitalization.characters,
                     decoration: const InputDecoration(
-                      labelText: 'Pembawa Materi / Guru',
-                      hintText: 'Contoh: H. Fulan',
+                      labelText: 'Kode Room',
+                      hintText: 'Contoh: NGAJI01 (Kosongkan utk acak)',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: isiMateriController,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Isi Materi / Nasehat',
-                      hintText: 'Ringkasan materi...',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      alignLabelWithHint: true,
+                  const SizedBox(height: 12),
+                  const Text(
+                    "* Bagikan kode ini ke Admin lain agar mereka bisa bergabung ke room yang sama.",
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blueGrey,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
@@ -470,16 +602,39 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                         description: template.description,
                         location: template.location,
                         targetAudience: template.targetAudience,
+                        roomCode: roomCodeController.text.trim().toUpperCase(),
                         isTemplate: false,
                         startedAt: combinedStartTime,
                         endedAt: combinedEndTime, // SIMPAN END TIME
                         level: template.level,
+                        // Full hierarchical context
+                        orgDaerahId: widget.user.orgDaerahId,
+                        orgDesaId: widget.user.orgDesaId,
+                        orgKelompokId: widget.user.orgKelompokId,
                       ),
                     );
 
                     // 2. Buat Materi (Jika diisi)
-                    if (guruController.text.isNotEmpty ||
-                        isiMateriController.text.isNotEmpty) {
+                    // Consolidate data from entries
+                    final List<String> guruNames = [];
+                    final List<String> consolidatedContent = [];
+
+                    for (var entry in materiEntries) {
+                      final name = entry['guru']?.text.trim() ?? '';
+                      final content = entry['isi']?.text.trim() ?? '';
+
+                      if (name.isNotEmpty || content.isNotEmpty) {
+                        if (name.isNotEmpty) guruNames.add(name);
+                        String entryDisplayContent = "";
+                        if (name.isNotEmpty) {
+                          entryDisplayContent += "Guru: $name\n";
+                        }
+                        entryDisplayContent += content;
+                        consolidatedContent.add(entryDisplayContent);
+                      }
+                    }
+
+                    if (consolidatedContent.isNotEmpty) {
                       final tanggalStr =
                           "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
 
@@ -488,10 +643,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                           id: '',
                           orgId: widget.orgId,
                           tanggal: tanggalStr,
-                          guru: guruController.text.isNotEmpty
-                              ? [guruController.text]
-                              : [],
-                          isi: isiMateriController.text,
+                          guru: guruNames,
+                          isi: consolidatedContent.join("\n\n---\n\n"),
                         ),
                       );
                     }
@@ -558,6 +711,9 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
     );
     final descController = TextEditingController(
       text: template?.description ?? "Pengajian rutin $level",
+    );
+    final roomCodeController = TextEditingController(
+      text: template?.roomCode ?? '',
     );
 
     final options = ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit'];
@@ -655,6 +811,19 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                       isDense: true,
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // 5. Kode Room (Template)
+                  TextField(
+                    controller: roomCodeController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Kode Room Default (Opsional)',
+                      hintText: 'Contoh: NGAJI01',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
                   const SizedBox(height: 24),
 
                   // Actions
@@ -682,6 +851,9 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                     description: descController.text,
                                     location: locationController.text,
                                     targetAudience: selectedTarget,
+                                    roomCode: roomCodeController.text
+                                        .trim()
+                                        .toUpperCase(),
                                     startedAt: template.startedAt,
                                     isTemplate: true,
                                     templateName: titleController.text,
@@ -697,6 +869,9 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                     description: descController.text,
                                     location: locationController.text,
                                     targetAudience: selectedTarget,
+                                    roomCode: roomCodeController.text
+                                        .trim()
+                                        .toUpperCase(),
                                     startedAt: DateTime.now(),
                                     isTemplate: true,
                                     templateName: titleController.text,
@@ -774,7 +949,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
     if (confirmed == true && context.mounted) {
       try {
-        await _pengajianService.deletePengajian(template.id);
+        await _pengajianService.deleteTemplate(template.id);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Menu cepat berhasil dihapus')),

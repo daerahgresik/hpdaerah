@@ -13,6 +13,7 @@ class PengajianQr {
   final String? pengajianTitle;
   final String? pengajianLocation;
   final DateTime? pengajianStartedAt;
+  final DateTime? pengajianEndedAt;
   final String? pengajianDescription;
   final String? targetAudience;
   final String? presensiStatus; // hadir, izin, dll.
@@ -28,6 +29,7 @@ class PengajianQr {
     this.pengajianTitle,
     this.pengajianLocation,
     this.pengajianStartedAt,
+    this.pengajianEndedAt,
     this.pengajianDescription,
     this.targetAudience,
     this.presensiStatus,
@@ -60,6 +62,12 @@ class PengajianQr {
           ? DateTime.parse(
               (pengajian?['started_at'] ?? json['pengajian_started_at'])
                   as String,
+            ).toLocal()
+          : null,
+      pengajianEndedAt:
+          (pengajian?['ended_at'] ?? json['pengajian_ended_at']) != null
+          ? DateTime.parse(
+              (pengajian?['ended_at'] ?? json['pengajian_ended_at']) as String,
             ).toLocal()
           : null,
       pengajianDescription:
@@ -98,6 +106,7 @@ class PengajianQr {
     String? pengajianTitle,
     String? pengajianLocation,
     DateTime? pengajianStartedAt,
+    DateTime? pengajianEndedAt,
     String? pengajianDescription,
     String? targetAudience,
     String? presensiStatus,
@@ -113,6 +122,7 @@ class PengajianQr {
       pengajianTitle: pengajianTitle ?? this.pengajianTitle,
       pengajianLocation: pengajianLocation ?? this.pengajianLocation,
       pengajianStartedAt: pengajianStartedAt ?? this.pengajianStartedAt,
+      pengajianEndedAt: pengajianEndedAt ?? this.pengajianEndedAt,
       pengajianDescription: pengajianDescription ?? this.pengajianDescription,
       targetAudience: targetAudience ?? this.targetAudience,
       presensiStatus: presensiStatus ?? this.presensiStatus,

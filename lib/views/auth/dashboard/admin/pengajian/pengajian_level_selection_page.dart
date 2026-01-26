@@ -1,13 +1,19 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_template_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_template_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_form_page.dart';
 
 class PengajianLevelPage extends StatefulWidget {
+  final UserModel user;
   final String orgId;
 
-  const PengajianLevelPage({super.key, required this.orgId});
+  const PengajianLevelPage({
+    super.key,
+    required this.user,
+    required this.orgId,
+  });
 
   @override
   State<PengajianLevelPage> createState() => _PengajianLevelPageState();
@@ -191,6 +197,7 @@ class _PengajianLevelPageState extends State<PengajianLevelPage> {
       context,
       MaterialPageRoute(
         builder: (_) => PengajianFormPage(
+          user: widget.user,
           orgId: widget.orgId,
           scope: template?.level ?? level, // Level
           template: template != null

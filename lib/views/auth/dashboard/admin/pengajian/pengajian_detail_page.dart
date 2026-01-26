@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/presensi_model.dart';
+import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -61,25 +62,147 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
         return;
       }
 
-      // 2. Check Target Audience (Target Kategori)
-      // Note: mapping target audience string to user categories
-      // User categories are usually in 'level' or just strings in targetAudience
-      // Based on FormPage items: ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit']
-      // We should check user's data. For now, let's assume it matches if not 'Semua'.
-      // If we want to be strict, we need to know where 'Muda-mudi' is stored in UserModel.
-      // Looking at UserModel, there is no 'category' field, maybe it is in 'jabatan' or 'keterangan'?
-      // Or maybe the user is part of an organization that has an ageCategory.
+      // 2. Show Verification Dialog (Anti-Fraud Rule Section 7A)
+      if (!mounted) return;
+      _showVerificationDialog(user);
+    } catch (e) {
+      _showErrorSnackBar("Gagal memproses data: $e");
+    }
+  }
 
-      // Let's just record for now and add a toast.
+  void _showVerificationDialog(UserModel user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Verifikasi Kehadiran",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 24),
+            // User Image
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.grey[200],
+              backgroundImage: user.fotoProfil != null
+                  ? NetworkImage(user.fotoProfil!)
+                  : null,
+              child: user.fotoProfil == null
+                  ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            // User Identity
+            Text(
+              user.nama,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Text(
+              "@${user.username}",
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
+            const Divider(height: 32),
+            // Org Info
+            _buildDialogInfoRow(
+              Icons.location_city,
+              "Daerah: ${user.daerahName ?? '-'}",
+            ),
+            _buildDialogInfoRow(
+              Icons.home_work,
+              "Desa: ${user.desaName ?? '-'}",
+            ),
+            _buildDialogInfoRow(
+              Icons.groups,
+              "Kelompok: ${user.kelompokName ?? '-'}",
+            ),
+            const SizedBox(height: 24),
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _recordManualPresence(user, 'tidak_hadir');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text("Tolak"),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _recordManualPresence(user, 'hadir');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A5F2D),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text("Hadir"),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _recordManualPresence(UserModel user, String status) async {
+    try {
       await _presensiService.recordPresence(
         pengajianId: widget.pengajian.id,
         userId: user.id!,
         method: 'qr',
+        status: status,
       );
 
-      _showSuccessSnackBar("Berhasil: ${user.nama} telah hadir");
+      if (status == 'hadir') {
+        _showSuccessSnackBar("Berhasil: ${user.nama} telah hadir");
+      } else {
+        _showErrorSnackBar("${user.nama} dicatat TIDAK HADIR");
+      }
     } catch (e) {
-      _showErrorSnackBar("Gagal: $e");
+      _showErrorSnackBar("Gagal mencatat: $e");
     }
   }
 
@@ -90,6 +213,7 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
         content: Text(msg),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -101,6 +225,7 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
         content: Text(msg),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }

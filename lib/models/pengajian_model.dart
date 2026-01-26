@@ -5,12 +5,16 @@
   final String? description;
   final String? location;
   final String? targetAudience;
+  final String? roomCode; // New Field
   final DateTime startedAt;
   final DateTime? endedAt;
   final String? createdBy;
   final bool isTemplate;
   final String? templateName;
   final int? level; // 0=Daerah, 1=Desa, 2=Kelompok
+  final String? orgDaerahId;
+  final String? orgDesaId;
+  final String? orgKelompokId;
 
   Pengajian({
     required this.id,
@@ -19,12 +23,16 @@
     this.description,
     this.location,
     this.targetAudience,
+    this.roomCode,
     required this.startedAt,
     this.endedAt,
     this.createdBy,
     this.isTemplate = false,
     this.templateName,
     this.level,
+    this.orgDaerahId,
+    this.orgDesaId,
+    this.orgKelompokId,
   });
 
   factory Pengajian.fromJson(Map<String, dynamic> json) {
@@ -35,6 +43,7 @@
       description: json['description'] as String?,
       location: json['location'] as String?,
       targetAudience: json['target_audience'] as String?,
+      roomCode: json['room_code'] as String?,
       startedAt: DateTime.parse(json['started_at'] as String).toLocal(),
       endedAt: json['ended_at'] != null
           ? DateTime.parse(json['ended_at'] as String).toLocal()
@@ -43,6 +52,9 @@
       isTemplate: json['is_template'] as bool? ?? false,
       templateName: json['template_name'] as String?,
       level: json['level'] as int?,
+      orgDaerahId: json['org_daerah_id'] as String?,
+      orgDesaId: json['org_desa_id'] as String?,
+      orgKelompokId: json['org_kelompok_id'] as String?,
     );
   }
 
@@ -54,12 +66,16 @@
       'description': description,
       'location': location,
       'target_audience': targetAudience,
+      'room_code': roomCode,
       'started_at': startedAt.toIso8601String(),
       'ended_at': endedAt?.toIso8601String(),
       'created_by': createdBy,
       'is_template': isTemplate,
       'template_name': templateName,
       'level': level,
+      'org_daerah_id': orgDaerahId,
+      'org_desa_id': orgDesaId,
+      'org_kelompok_id': orgKelompokId,
     };
   }
 }

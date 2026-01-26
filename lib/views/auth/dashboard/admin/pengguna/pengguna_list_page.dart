@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:barcode_widget/barcode_widget.dart';
 
 class PenggunaListPage extends StatefulWidget {
   final UserModel? currentUser;
@@ -374,77 +372,6 @@ class _PenggunaListPageState extends State<PenggunaListPage>
       default:
         return null;
     }
-  }
-
-  void _showUserBarcode(Map<String, dynamic> user) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            Text(
-              user['nama'] ?? '-',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Text(
-              '@${user['username'] ?? '-'}',
-              style: TextStyle(color: Colors.grey[500], fontSize: 14),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A5F2D).withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: QrImageView(
-                data: user['username'] ?? '',
-                version: QrVersions.auto,
-                size: 180.0,
-                eyeStyle: const QrEyeStyle(
-                  eyeShape: QrEyeShape.square,
-                  color: Color(0xFF1A5F2D),
-                ),
-                dataModuleStyle: const QrDataModuleStyle(
-                  dataModuleShape: QrDataModuleShape.square,
-                  color: Color(0xFF1A5F2D),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            BarcodeWidget(
-              barcode: Barcode.code128(),
-              data: user['username'] ?? '',
-              width: 200,
-              height: 60,
-              drawText: false,
-              color: Colors.black87,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              (user['username'] ?? '').toString().toUpperCase(),
-              style: const TextStyle(
-                letterSpacing: 2,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showAdminLevelDialog(Map<String, dynamic> user) {
@@ -854,71 +781,70 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                             child: Column(
                               // Ganti ListView dengan Column karena sudah di dlm ScrollView
                               children: [
-                                const SizedBox(height: 8),
-                                // Opsi 1: Kelompok (Level 3)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: _buildSubOptionItem(
-                                    label: 'Kelompok',
-                                    isSelected: selectedLevel == 3,
-                                    onTap: () => setModalState(() {
-                                      selectedLevel = 3;
-                                      selectedOrgId = _getAutoOrgId(user, 3);
-                                    }),
-                                  ),
-                                ),
-
-                                // Opsi 2: Kategori-kategori (Level 4)
+                                // Consolidate 4 categories as per rules
                                 ...() {
-                                  // Filter: Sembunyikan 'Kelompok Dewasa' agar tidak duplikat konsep
-                                  final cats = _getCategoriesForUser(user)
-                                      .where(
-                                        (c) => !(c['name'] as String)
-                                            .toLowerCase()
-                                            .contains('dewasa'),
-                                      )
-                                      .toList();
+                                  final hierarchy = _getUserOrgHierarchy(user);
+                                  final kelompokId = hierarchy['kelompok'];
+                                  final allCats = _getCategoriesForUser(user);
 
-                                  cats.sort((a, b) {
-                                    final nameA = (a['name'] as String)
-                                        .toLowerCase();
-                                    final nameB = (b['name'] as String)
-                                        .toLowerCase();
+                                  // Required labels
+                                  final labels = [
+                                    'Kelompok',
+                                    'Muda-mudi',
+                                    'Praremaja',
+                                    'Caberawit',
+                                  ];
 
-                                    int score(String n) {
-                                      if (n.contains('muda')) return 1;
-                                      if (n.contains('pra')) return 2;
-                                      if (n.contains('caberawit') ||
-                                          n.contains('cabe')) {
-                                        return 3;
+                                  return labels.map((label) {
+                                    bool isSelected = false;
+                                    VoidCallback? onSelect;
+
+                                    if (label == 'Kelompok') {
+                                      isSelected = selectedLevel == 3;
+                                      onSelect = kelompokId == null
+                                          ? null
+                                          : () => setModalState(() {
+                                              selectedLevel = 3;
+                                              selectedOrgId = kelompokId;
+                                            });
+                                    } else {
+                                      // Search for category item matching this label
+                                      final cat = allCats.firstWhere((c) {
+                                        final name = (c['name'] as String)
+                                            .toLowerCase();
+                                        final search = label.toLowerCase();
+                                        return name.contains(search) ||
+                                            (search == 'muda-mudi' &&
+                                                name.contains('muda'));
+                                      }, orElse: () => {});
+
+                                      if (cat.isNotEmpty) {
+                                        isSelected =
+                                            selectedLevel == 4 &&
+                                            selectedOrgId == cat['id'];
+                                        onSelect = () => setModalState(() {
+                                          selectedLevel = 4;
+                                          selectedOrgId = cat['id'];
+                                        });
                                       }
-                                      return 4;
                                     }
 
-                                    return score(nameA).compareTo(score(nameB));
-                                  });
+                                    if (onSelect == null) {
+                                      return const SizedBox.shrink();
+                                    }
 
-                                  return cats.map((cat) {
-                                    final isSelected =
-                                        selectedLevel == 4 &&
-                                        selectedOrgId == cat['id'];
                                     return Padding(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                         vertical: 4,
                                       ),
                                       child: _buildSubOptionItem(
-                                        label: cat['name'],
+                                        label: label,
                                         isSelected: isSelected,
-                                        onTap: () => setModalState(() {
-                                          selectedLevel = 4;
-                                          selectedOrgId = cat['id'];
-                                        }),
+                                        onTap: onSelect,
                                       ),
                                     );
-                                  });
+                                  }).toList();
                                 }(),
                                 const SizedBox(height: 8),
                               ],
@@ -1233,76 +1159,216 @@ class _PenggunaListPageState extends State<PenggunaListPage>
     final passwordCtrl = TextEditingController(text: user['password'] ?? '');
     final noWaCtrl = TextEditingController(text: user['no_wa'] ?? '');
     final asalCtrl = TextEditingController(text: user['asal'] ?? '');
-    final statusCtrl = TextEditingController(text: user['status_warga'] ?? '');
-    bool isPasswordVisible = false;
+    final detailKeperluanCtrl = TextEditingController(
+      text: user['detail_keperluan'] ?? '',
+    );
+
+    String? statusWarga = user['status_warga'];
+    String? keperluan = user['keperluan'];
+
+    // Org Hierarchy Initial State
+    String? selDaerahId = user['org_daerah_id'];
+    String? selDesaId = user['org_desa_id'];
+    String? selKelompokId = user['org_kelompok_id'];
+    String? selKategoriId = user['org_kategori_id'];
+
+    bool isPassVisible = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (statefulCtx, setStateDialog) {
+          // Computed Lists
+          final listDaerah = _organisations
+              .where((o) => o['level'] == 0)
+              .toList();
+          final listDesa = _organisations
+              .where((o) => o['level'] == 1 && o['parent_id'] == selDaerahId)
+              .toList();
+          final listKelompok = _organisations
+              .where((o) => o['level'] == 2 && o['parent_id'] == selDesaId)
+              .toList();
+          final listKategori = _organisations
+              .where((o) => o['level'] == 3 && o['parent_id'] == selKelompokId)
+              .toList();
+
           return AlertDialog(
             title: const Text('Edit Data User'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nama Lengkap',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: usernameCtrl,
-                    decoration: const InputDecoration(labelText: 'Username'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: passwordCtrl,
-                    obscureText: !isPasswordVisible,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          isPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setStateDialog(() {
-                            isPasswordVisible = !isPasswordVisible;
-                          });
-                        },
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            content: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- IDENTITAS ---
+                    _buildSectionHeader('Identitas Dasar'),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nama Lengkap',
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Admin dapat melihat & mengubah password user secara langsung.',
-                    style: TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noWaCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'No. WhatsApp',
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: usernameCtrl,
+                      decoration: const InputDecoration(labelText: 'Username'),
                     ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: asalCtrl,
-                    decoration: const InputDecoration(labelText: 'Asal Daerah'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: statusCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Status Warga (Asli/Perantau)',
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: passwordCtrl,
+                      obscureText: !isPassVisible,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            isPassVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: () => setStateDialog(
+                            () => isPassVisible = !isPassVisible,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noWaCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'No. WhatsApp',
+                        hintText: 'Contoh: 08123456789',
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+
+                    const SizedBox(height: 24),
+                    // --- STATUS WARGA ---
+                    _buildSectionHeader('Status & Keperluan'),
+                    DropdownButtonFormField<String>(
+                      value: statusWarga,
+                      decoration: const InputDecoration(
+                        labelText: 'Status Warga',
+                      ),
+                      items: ['Warga Asli', 'Perantau'].map((s) {
+                        return DropdownMenuItem(value: s, child: Text(s));
+                      }).toList(),
+                      onChanged: (val) =>
+                          setStateDialog(() => statusWarga = val),
+                    ),
+
+                    if (statusWarga == 'Perantau') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: asalCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Asal Daerah',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: keperluan,
+                        decoration: const InputDecoration(
+                          labelText: 'Keperluan',
+                        ),
+                        items: ['MT', 'Kuliah', 'Bekerja'].map((s) {
+                          return DropdownMenuItem(value: s, child: Text(s));
+                        }).toList(),
+                        onChanged: (val) =>
+                            setStateDialog(() => keperluan = val),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: detailKeperluanCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Detail Keperluan',
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+                    // --- ORGANISASI ---
+                    _buildSectionHeader('Penempatan Organisasi'),
+                    // DAERAH
+                    DropdownButtonFormField<String>(
+                      value: selDaerahId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Daerah'),
+                      items: listDaerah.map((o) {
+                        return DropdownMenuItem(
+                          value: o['id'] as String,
+                          child: Text(o['name'] ?? '-'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setStateDialog(() {
+                          selDaerahId = val;
+                          selDesaId = null;
+                          selKelompokId = null;
+                          selKategoriId = null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // DESA
+                    DropdownButtonFormField<String>(
+                      value: selDesaId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Desa'),
+                      items: listDesa.map((o) {
+                        return DropdownMenuItem(
+                          value: o['id'] as String,
+                          child: Text(o['name'] ?? '-'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setStateDialog(() {
+                          selDesaId = val;
+                          selKelompokId = null;
+                          selKategoriId = null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // KELOMPOK
+                    DropdownButtonFormField<String>(
+                      value: selKelompokId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Kelompok'),
+                      items: listKelompok.map((o) {
+                        return DropdownMenuItem(
+                          value: o['id'] as String,
+                          child: Text(o['name'] ?? '-'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setStateDialog(() {
+                          selKelompokId = val;
+                          selKategoriId = null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // KATEGORI
+                    DropdownButtonFormField<String>(
+                      value: selKategoriId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Kategori'),
+                      items: listKategori.map((o) {
+                        return DropdownMenuItem(
+                          value: o['id'] as String,
+                          child: Text(o['name'] ?? '-'),
+                        );
+                      }).toList(),
+                      onChanged: (val) =>
+                          setStateDialog(() => selKategoriId = val),
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -1313,6 +1379,13 @@ class _PenggunaListPageState extends State<PenggunaListPage>
               ElevatedButton(
                 onPressed: () async {
                   try {
+                    // Determine Lowest Level Org ID
+                    final determinedOrgId =
+                        selKategoriId ??
+                        selKelompokId ??
+                        selDesaId ??
+                        selDaerahId;
+
                     await Supabase.instance.client
                         .from('users')
                         .update({
@@ -1321,24 +1394,68 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           'password': passwordCtrl.text,
                           'no_wa': noWaCtrl.text,
                           'asal': asalCtrl.text,
-                          'status_warga': statusCtrl.text,
+                          'status_warga': statusWarga,
+                          'keperluan': keperluan,
+                          'detail_keperluan': detailKeperluanCtrl.text,
+                          'org_daerah_id': selDaerahId,
+                          'org_desa_id': selDesaId,
+                          'org_kelompok_id': selKelompokId,
+                          'org_kategori_id': selKategoriId,
+                          'current_org_id': determinedOrgId,
                         })
                         .eq('id', user['id']);
 
                     if (statefulCtx.mounted) {
                       Navigator.pop(statefulCtx);
                       _showSnackBar('Data user berhasil diperbarui');
-                      _loadData(); // Refresh list
+                      _loadData();
                     }
                   } catch (e) {
                     _showSnackBar('Gagal update: $e', isError: true);
                   }
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  foregroundColor: Colors.white,
+                ),
                 child: const Text('Simpan'),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF059669),
+                ),
+              ),
+            ],
+          ),
+          const Divider(),
+        ],
       ),
     );
   }
@@ -1932,8 +2049,6 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                         _showEditUserDialog(user);
                       } else if (value == 'admin') {
                         _showAdminLevelDialog(user);
-                      } else if (value == 'barcode') {
-                        _showUserBarcode(user);
                       } else if (value == 'delete') {
                         _deleteUser(user);
                       }
@@ -1950,12 +2065,6 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                         Icons.admin_panel_settings,
                         'Atur Level',
                         const Color(0xFF059669),
-                      ),
-                      _buildPopupMenuItem(
-                        'barcode',
-                        Icons.qr_code_2_rounded,
-                        'Lihat Barcode',
-                        const Color(0xFF1A5F2D),
                       ),
                       _buildPopupMenuItem(
                         'delete',

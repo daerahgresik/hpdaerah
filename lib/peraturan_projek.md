@@ -297,3 +297,43 @@ CREATE TABLE pengajian_qr (
 4. **QR Sekali Pakai:** Mencegah penyalahgunaan (titip absen, share QR, dll).
 
 5. **Target Spesifik:** Pengajian selalu punya target yang jelas, QR hanya untuk target tersebut.
+
+---
+
+## 7. VERIFIKASI PRESENSI & KEAMANAN LANJUTAN
+
+### A. Verifikasi Identitas (Anti-Fraud)
+Setiap kali Admin melakukan scan QR Code, sistem **WAJIB** menampilkan dialog verifikasi yang berisi:
+1.  **Foto Profil asli** pengguna.
+2.  **Nama Lengkap**.
+3.  **Detail Organisasi** (Kelompok, Desa, Daerah).
+
+**Tindakan Admin:**
+*   **Terima (Hadir):** Jika data sesuai dengan orang yang membawa perangkat.
+*   **Tolak (Bukan Dia):** Jika pemegang akun berbeda. Status pengguna tersebut langsung dicatat sebagai **"Tidak Hadir"**. Pengguna asli harus menggunakan akun pribadinya sendiri untuk mendapatkan kode yang valid.
+
+### B. Otomatisasi Status "Alpha" (Tidak Hadir)
+*   Fitur "Hapus Room" di Menu Aktif kini berfungsi sebagai fungsi **Penutupan Room**.
+*   Saat Room ditutup, sistem secara otomatis:
+    1.  Mencari semua target pengguna yang **belum** melakukan presensi (is_used = false).
+    2.  Mencatat mereka sebagai **"Tidak Hadir"** di rekap presensi.
+    3.  Tandai QR agar hangus dari peranti pengguna tersebut.
+*   User akan melihat status **"Tercatat Tidak Menghadiri"** pada menu QR Code mereka untuk pengajian tersebut.
+
+---
+
+## 8. PRESENSI CENTER & REKAPITULASI
+
+### A. Tampilan Berbasis Scope
+Daftar hadir pada Presensi Center menampilkan seluruh target pengguna yang seharusnya hadir (bukan hanya yang sudah hadir). Daftar ini difilter ketat berdasarkan level Admin:
+*   **Admin Kelompok:** Hanya melihat anggota kelompoknya.
+*   **Admin Desa:** Melihat seluruh anggota di kelompok-kelompok naungan desanya.
+*   **Admin Daerah:** Melihat seluruh anggota di wilayah daerahnya.
+
+### B. Kontrol Manual Admin
+Selain melalui Scan QR, Admin memiliki otoritas manual untuk mengubah status anggota yang BELUM absen:
+1.  **Centang (Hadir):** Mencatat kehadiran manual.
+2.  **Izin:** Mencatat izin (wajib mengisi alasan/keterangan).
+3.  **Alpha (Silang):** Memaksa status menjadi tidak hadir.
+
+*Setiap tindakan manual Admin akan mencatat `approved_by` dan metode `manual_admin` untuk audit.*

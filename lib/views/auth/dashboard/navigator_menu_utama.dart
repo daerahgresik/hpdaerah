@@ -189,7 +189,7 @@ class _AdminTabState extends State<AdminTab> {
         );
 
       case '/admin/presensi-center':
-        return const PresensiCenterPage();
+        return PresensiCenterPage(user: widget.user);
 
       case '/admin/pengajian/buat':
         return PengajianDashboardPage(

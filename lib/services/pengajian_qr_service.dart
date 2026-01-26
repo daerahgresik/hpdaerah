@@ -30,20 +30,44 @@ class PengajianQrService {
   Future<int> generateQrForTargetUsers({
     required String pengajianId,
     required String targetOrgId,
+    String? targetAudience,
   }) async {
     try {
       // 1. Ambil semua user yang terdaftar di organisasi target
       // Ini mencakup user di org tersebut DAN semua child org di bawahnya
-      final targetUsers = await _getTargetUsers(targetOrgId);
+      final targetUsers = await _getTargetUsers(
+        targetOrgId,
+        targetAudience: targetAudience,
+      );
 
       if (targetUsers.isEmpty) {
         debugPrint('No target users found for org: $targetOrgId');
         return 0;
       }
 
-      // 2. Generate QR untuk setiap user
+      // 2. Filter out users who already have a QR code for this pengajian
+      final existingResponse = await _client
+          .from('pengajian_qr')
+          .select('user_id')
+          .eq('pengajian_id', pengajianId);
+
+      final List<dynamic> existingData = existingResponse as List<dynamic>;
+      final existingUserIds = existingData
+          .map((e) => e['user_id'].toString())
+          .toSet();
+
+      final newTargetUsers = targetUsers
+          .where((uid) => !existingUserIds.contains(uid))
+          .toList();
+
+      if (newTargetUsers.isEmpty) {
+        debugPrint('All target users already have QR codes.');
+        return 0;
+      }
+
+      // 3. Generate QR untuk setiap user baru
       final qrRecords = <Map<String, dynamic>>[];
-      for (final userId in targetUsers) {
+      for (final userId in newTargetUsers) {
         final qrCode = _generateUniqueQrCode(pengajianId, userId);
         qrRecords.add({
           'pengajian_id': pengajianId,
@@ -53,11 +77,11 @@ class PengajianQrService {
         });
       }
 
-      // 3. Batch insert ke database
+      // 4. Batch insert ke database
       await _client.from('pengajian_qr').insert(qrRecords);
 
       debugPrint(
-        'Generated ${qrRecords.length} QR codes for pengajian: $pengajianId',
+        'Generated ${qrRecords.length} new QR codes for pengajian: $pengajianId',
       );
       return qrRecords.length;
     } catch (e) {
@@ -66,21 +90,67 @@ class PengajianQrService {
     }
   }
 
-  /// Ambil semua user ID yang menjadi target (termasuk child orgs)
-  Future<List<String>> _getTargetUsers(String orgId) async {
+  Future<List<String>> _getTargetUsers(
+    String orgId, {
+    String? targetAudience,
+  }) async {
     try {
-      // Ambil org target dan semua child-nya secara rekursif
-      final allOrgIds = await _getAllChildOrgIds(orgId);
-      allOrgIds.add(orgId); // Include the target org itself
-
-      // Ambil semua user yang current_org_id-nya ada di daftar org
-      final response = await _client
+      // 1. Get Absolute Hierarchy Scope
+      // Anyone who belongs to this org at any level (Daerah/Desa/Kelompok)
+      final scopeResponse = await _client
           .from('users')
-          .select('id')
-          .filter('current_org_id', 'in', allOrgIds);
+          .select('id, is_admin, current_org_id')
+          .or(
+            'org_daerah_id.eq.$orgId,org_desa_id.eq.$orgId,org_kelompok_id.eq.$orgId',
+          );
 
-      final users = response as List<dynamic>;
-      return users.map((u) => u['id'] as String).toList();
+      final List<dynamic> usersInScope = scopeResponse as List<dynamic>;
+
+      if (usersInScope.isEmpty) return [];
+
+      // 2. Audience Targeting Logic
+      String? targetCategory;
+      if (targetAudience != null && targetAudience != 'Semua') {
+        if (targetAudience == 'Muda - mudi') targetCategory = 'remaja';
+        if (targetAudience == 'Praremaja') targetCategory = 'praremaja';
+        if (targetAudience == 'Caberawit') targetCategory = 'caberawit';
+      }
+
+      // If "Semua", everyone in hierarchy gets the QR
+      if (targetCategory == null) {
+        return usersInScope.map((u) => u['id'].toString()).toList();
+      }
+
+      // 3. For Targeted Rooms: Youth + Admins
+      // First, find which organizations in this hierarchy match the category
+      final allChildOrgIds = await _getAllChildOrgIds(orgId);
+      allChildOrgIds.add(orgId);
+
+      final categoryOrgsResponse = await _client
+          .from('organizations')
+          .select('id')
+          .filter('id', 'in', allChildOrgIds)
+          .eq('age_category', targetCategory);
+
+      final List<dynamic> catOrgs = categoryOrgsResponse as List<dynamic>;
+      final List<String> validOrgIdsForCategory = catOrgs
+          .map((o) => o['id'].toString())
+          .toList();
+
+      // Now filter users in scope:
+      // Include if: User is an Admin OR User's current_org matches the category
+      final List<String> targetUserIds = [];
+      for (final u in usersInScope) {
+        final bool isAdmin = u['is_admin'] == true;
+        final String? userOrg = u['current_org_id']?.toString();
+
+        if (isAdmin ||
+            (userOrg != null && validOrgIdsForCategory.contains(userOrg))) {
+          targetUserIds.add(u['id'].toString());
+        }
+      }
+
+      return targetUserIds;
     } catch (e) {
       debugPrint('Error getting target users: $e');
       return [];
@@ -98,7 +168,7 @@ class PengajianQrService {
           .eq('parent_id', parentId);
 
       for (final child in children) {
-        final childId = child['id'] as String;
+        final childId = child['id'].toString();
         result.add(childId);
         // Rekursif ke bawah
         final grandChildren = await _getAllChildOrgIds(childId);
@@ -120,10 +190,13 @@ class PengajianQrService {
         .eq('user_id', userId)
         .order('created_at', ascending: false)
         .asyncMap((data) async {
-          // Filter only unused QRs and fetch pengajian details
+          // Explicit cast for Web compatibility
+          final listData = (data as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
           final results = <PengajianQr>[];
 
-          for (final qrData in data) {
+          for (final qrData in listData) {
             // Fetch pengajian details
             final pengajianId = qrData['pengajian_id'];
             final pengajianResponse = await _client

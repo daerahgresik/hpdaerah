@@ -29,6 +29,16 @@ class UserModel {
   final String? orgKelompokId;
   final String? orgKategoriId;
 
+  // Organization Names (Loaded on demand or via Join)
+  final String? orgDaerahName;
+  final String? orgDesaName;
+  final String? orgKelompokName;
+
+  // Virtual Getters for consistency with UI
+  String? get daerahName => orgDaerahName;
+  String? get desaName => orgDesaName;
+  String? get kelompokName => orgKelompokName;
+
   UserModel({
     this.id,
     required this.username,
@@ -54,6 +64,9 @@ class UserModel {
     this.orgDesaId,
     this.orgKelompokId,
     this.orgKategoriId,
+    this.orgDaerahName,
+    this.orgDesaName,
+    this.orgKelompokName,
   });
 
   /// Check if user is Super Admin (can manage everything)
@@ -128,6 +141,9 @@ class UserModel {
       orgDesaId: json['org_desa_id'],
       orgKelompokId: json['org_kelompok_id'],
       orgKategoriId: json['org_kategori_id'],
+      orgDaerahName: json['daerah_name'],
+      orgDesaName: json['desa_name'],
+      orgKelompokName: json['kelompok_name'],
     );
   }
 
