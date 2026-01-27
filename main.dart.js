@@ -101462,8 +101462,8 @@ k=l
 h=n.a.at
 h===$&&A.a()
 s=7
-return A.l(h.aR("avatars").vX(k,b,B.on),$async$Ex)
-case 7:j=h.aR("avatars").II(k)
+return A.l(h.aR("fotoprofil").vX(k,b,B.on),$async$Ex)
+case 7:j=h.aR("fotoprofil").II(k)
 q=j
 s=1
 break
@@ -101563,8 +101563,8 @@ k=l
 i=n.a.at
 i===$&&A.a()
 s=7
-return A.l(i.aR("avatars").vX(k,a,B.on),$async$Ev)
-case 7:i=i.aR("avatars").II(k)
+return A.l(i.aR("fotoprofil").vX(k,a,B.on),$async$Ev)
+case 7:i=i.aR("fotoprofil").II(k)
 q=i
 s=1
 break
@@ -103044,8 +103044,8 @@ k=l
 i=n.a.at
 i===$&&A.a()
 s=7
-return A.l(i.aR("avatars").vX(k,b,B.on),$async$Ew)
-case 7:i=i.aR("avatars").II(k)
+return A.l(i.aR("fotoprofil").vX(k,b,B.on),$async$Ew)
+case 7:i=i.aR("fotoprofil").II(k)
 q=i
 s=1
 break
