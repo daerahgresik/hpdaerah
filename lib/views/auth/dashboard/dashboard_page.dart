@@ -82,35 +82,39 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ],
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
-                  label: 'Beranda',
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.qr_code_scanner,
-                  activeIcon: Icons.qr_code_2,
-                  label: 'QR Code',
-                ),
-                if (widget.user.isAdmin)
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   _buildNavItem(
-                    index: 2,
-                    icon: Icons.admin_panel_settings_outlined,
-                    activeIcon: Icons.admin_panel_settings,
-                    label: 'Admin',
+                    index: 0,
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
+                    label: 'Beranda',
                   ),
-                _buildNavItem(
-                  index: widget.user.isAdmin ? 3 : 2,
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
-                  label: 'Profil',
-                ),
-              ],
+                  _buildNavItem(
+                    index: 1,
+                    icon: Icons.qr_code_scanner,
+                    activeIcon: Icons.qr_code_2,
+                    label: 'QR Code',
+                  ),
+                  if (widget.user.isAdmin)
+                    _buildNavItem(
+                      index: 2,
+                      icon: Icons.admin_panel_settings_outlined,
+                      activeIcon: Icons.admin_panel_settings,
+                      label: 'Admin',
+                    ),
+                  _buildNavItem(
+                    index: widget.user.isAdmin ? 3 : 2,
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person,
+                    label: 'Profil',
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -129,7 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
       onTap: () => _onItemTapped(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF1A5F2D).withValues(alpha: 0.1)
@@ -142,7 +146,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Icon(
               isSelected ? activeIcon : icon,
               color: isSelected ? const Color(0xFF1A5F2D) : Colors.grey[500],
-              size: 26,
+              size: 24,
             ),
             const SizedBox(height: 4),
             Text(
