@@ -332,6 +332,19 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // TOMBOL DETAIL IZIN (Cek foto & alasan)
+            if (isIzin) ...[
+              _buildActionButton(
+                icon: Icons.visibility_rounded,
+                color: Colors.blue.shade700,
+                bgColor: Colors.blue.shade50,
+                onTap: () => _showIzinDetailDialog(item),
+                isActive: true,
+                tooltip: "Lihat Detail Izin",
+              ),
+              const SizedBox(width: 8),
+            ],
+
             // TOMBOL IZIN
             _buildActionButton(
               icon: Icons.info_rounded,
@@ -341,7 +354,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                   : Colors.blueGrey.shade50.withValues(alpha: 0.5),
               onTap: () => _showIzinDialog(item),
               isActive: isIzin,
-              tooltip: "Proses Izin",
+              tooltip: isIzin ? "Ubah Izin" : "Proses Izin",
             ),
             const SizedBox(width: 14),
             // TOMBOL HADIR
@@ -575,6 +588,159 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _showIzinDetailDialog(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: EdgeInsets.zero,
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header Image
+            Stack(
+              children: [
+                Container(
+                  height: 250,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  child: item['foto_izin'] != null
+                      ? GestureDetector(
+                          onTap: () => _showFullScreenImage(item['foto_izin']),
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
+                            child: Image.network(
+                              item['foto_izin'],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.image_not_supported_rounded,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                        ),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.black26,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.amber.shade100,
+                        child: Icon(
+                          Icons.info_rounded,
+                          size: 14,
+                          color: Colors.amber.shade800,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "KETERANGAN IZIN",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.shade100),
+                    ),
+                    child: Text(
+                      item['keterangan'] ?? "Tidak ada alasan tertulis",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Jamaah: ${item['nama']}",
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenImage(String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            Center(child: Image.network(url, fit: BoxFit.contain)),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
