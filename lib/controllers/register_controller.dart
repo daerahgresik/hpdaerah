@@ -102,6 +102,11 @@ class RegisterController {
         });
       }
     } catch (e) {
+      // Check for duplicate username error (Postgres error code 23505)
+      if (e.toString().contains('users_username_key') ||
+          e.toString().contains('23505')) {
+        throw 'Username sudah digunakan. Silakan pilih username lain.';
+      }
       throw 'Registrasi gagal: $e';
     }
   }
