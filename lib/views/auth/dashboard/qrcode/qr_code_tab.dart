@@ -23,8 +23,8 @@ class _QrCodeTabState extends State<QrCodeTab> {
   void initState() {
     super.initState();
     _initStream();
-    // Refresh UI every minute for countdowns
-    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+    // Refresh UI every second for real-time countdowns
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
     });
   }
@@ -123,11 +123,11 @@ class _QrCodeTabState extends State<QrCodeTab> {
         final diff = startTime.difference(now);
         if (diff.inDays > 0) {
           statusText = "Mulai dlm ${diff.inDays} hari";
-        } else if (diff.inHours > 0) {
-          statusText =
-              "Mulai dlm ${diff.inHours} jam ${diff.inMinutes % 60} mnt";
         } else {
-          statusText = "Mulai dlm ${diff.inMinutes} menit";
+          final h = diff.inHours.toString().padLeft(2, '0');
+          final m = (diff.inMinutes % 60).toString().padLeft(2, '0');
+          final s = (diff.inSeconds % 60).toString().padLeft(2, '0');
+          statusText = "Mulai dlm $h:$m:$s";
         }
         statusColor = Colors.orange;
         statusIcon = Icons.upcoming;

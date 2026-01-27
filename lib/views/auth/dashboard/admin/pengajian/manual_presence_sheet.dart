@@ -399,8 +399,17 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   }
 
   void _showIzinDialog(Map<String, dynamic> item) {
-    final reasonCtrl = TextEditingController(text: item['keterangan']);
+    String? selectedReason;
+    final otherReasonCtrl = TextEditingController();
     File? selectedImage;
+
+    final reasons = [
+      "Sakit",
+      "Kerja / Lembur",
+      "Acara Keluarga",
+      "Tugas Luar",
+      "Lainnya",
+    ];
 
     showDialog(
       context: context,
@@ -417,60 +426,63 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: reasonCtrl,
-                    maxLines: 2,
+                  const Text(
+                    "Alasan Izin",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedReason,
                     decoration: InputDecoration(
-                      hintText: "Alasan izin...",
                       filled: true,
                       fillColor: Colors.grey[50],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                      ),
                     ),
+                    hint: const Text("Pilih Alasan"),
+                    items: reasons.map((r) {
+                      return DropdownMenuItem(value: r, child: Text(r));
+                    }).toList(),
+                    onChanged: (val) {
+                      setDialogState(() => selectedReason = val);
+                    },
                   ),
-                  const SizedBox(height: 16),
+                  if (selectedReason == "Lainnya") ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: otherReasonCtrl,
+                      decoration: InputDecoration(
+                        hintText: "Sebutkan alasan lainnya...",
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   const Text(
-                    "Foto Bukti (Galeri/Kamera)",
+                    "Foto Bukti (Wajib Kamera)",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () async {
-                      final source = await showModalBottomSheet<ImageSource>(
-                        context: context,
-                        builder: (c) => SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(Icons.camera_alt),
-                                title: const Text("Kamera"),
-                                onTap: () =>
-                                    Navigator.pop(c, ImageSource.camera),
-                              ),
-                              ListTile(
-                                leading: const Icon(Icons.photo_library),
-                                title: const Text("Galeri"),
-                                onTap: () =>
-                                    Navigator.pop(c, ImageSource.gallery),
-                              ),
-                            ],
-                          ),
-                        ),
+                      final picked = await _picker.pickImage(
+                        source: ImageSource.camera,
+                        imageQuality: 50,
                       );
-
-                      if (source != null) {
-                        final picked = await _picker.pickImage(
-                          source: source,
-                          imageQuality: 50,
-                        );
-                        if (picked != null) {
-                          setDialogState(() {
-                            selectedImage = File(picked.path);
-                          });
-                        }
+                      if (picked != null) {
+                        setDialogState(() {
+                          selectedImage = File(picked.path);
+                        });
                       }
                     },
                     child: Container(
@@ -493,13 +505,13 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const Icon(
-                                  Icons.add_a_photo_outlined,
+                                  Icons.camera_alt_outlined,
                                   size: 40,
-                                  color: Colors.blue,
+                                  color: Colors.green,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  "Klik untuk ambil foto",
+                                  "Klik untuk Ambil Foto",
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 12,
@@ -513,7 +525,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        "Sudah ada foto terunggah",
+                        "Sudah ada foto bukti sebelumnya",
                         style: TextStyle(
                           color: Colors.green[700],
                           fontSize: 10,
@@ -538,14 +550,25 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                   ),
                 ),
                 onPressed: () {
-                  if (reasonCtrl.text.isEmpty) {
+                  if (selectedReason == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Alasan harus diisi")),
+                      const SnackBar(content: Text("Pilih alasan izin")),
                     );
                     return;
                   }
+                  if (selectedImage == null && item['foto_izin'] == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Foto bukti wajib")),
+                    );
+                    return;
+                  }
+
+                  final finalReason = selectedReason == "Lainnya"
+                      ? "Lainnya: ${otherReasonCtrl.text}"
+                      : selectedReason!;
+
                   Navigator.pop(ctx);
-                  _processIzin(item, reasonCtrl.text, selectedImage);
+                  _processIzin(item, finalReason, selectedImage);
                 },
                 child: const Text("Simpan Izin"),
               ),
