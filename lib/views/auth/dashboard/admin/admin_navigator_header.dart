@@ -111,29 +111,25 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
           // Menu Navigation
           Container(
             padding: EdgeInsets.symmetric(
-              vertical: 12,
-              horizontal: isTablet ? 24 : 12,
+              vertical: 8, // Slightly tighter
+              horizontal: isTablet ? 24 : 8, // Tighter padding for mobile
             ),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: isTablet ? 600 : double.infinity,
+                  maxWidth: isTablet ? 800 : double.infinity,
                 ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
-                    children: adminMenus.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final menu = entry.value;
+                    children: adminMenus.map((menu) {
                       final isSelected = widget.selectedRoute == menu.route;
 
                       return Padding(
-                        padding: EdgeInsets.only(
-                          left: index == 0 ? 0 : 6,
-                          right: index == adminMenus.length - 1 ? 0 : 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: _AdminMenuChip(
                           title: menu.title,
                           icon: menu.icon,
@@ -236,7 +232,9 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -467,22 +465,22 @@ class _AdminMenuChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF059669) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF059669)
-                : Colors.grey.withValues(alpha: 0.25),
-            width: isSelected ? 2 : 1,
+                : Colors.grey.withValues(alpha: 0.2),
+            width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF059669).withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF059669).withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : null,
@@ -490,12 +488,12 @@ class _AdminMenuChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: isSelected ? Colors.white : color),
-            const SizedBox(width: 8),
+            Icon(icon, size: 14, color: isSelected ? Colors.white : color),
+            const SizedBox(width: 6),
             Text(
               title,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: isSelected ? Colors.white : Colors.grey[800],
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
