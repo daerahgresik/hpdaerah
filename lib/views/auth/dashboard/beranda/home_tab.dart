@@ -57,7 +57,7 @@ class HomeTab extends StatelessWidget {
                     // Status Card
                     Container(
                       padding: const EdgeInsets.all(20),
-                      margin: const EdgeInsets.only(bottom: 24),
+                      margin: const EdgeInsets.only(top: 10, bottom: 32),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -74,7 +74,9 @@ class HomeTab extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+                              color: const Color(
+                                0xFF1A5F2D,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -110,11 +112,15 @@ class HomeTab extends StatelessWidget {
                       ),
                     ),
 
-                    const Text(
-                      "Menu Utama",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.0),
+                      child: Text(
+                        "Menu Utama",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -152,13 +158,9 @@ class HomeTab extends StatelessWidget {
 
   Widget _buildHeaderBackground() {
     return Container(
-      height: 220,
+      height: 160,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1A5F2D), Color(0xFF2E7D32)],
-        ),
+        color: Color(0xFF1A5F2D),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
