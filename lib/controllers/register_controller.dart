@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/organization_model.dart';
 import 'package:hpdaerah/services/organization_service.dart';
+import 'package:hpdaerah/utils/image_helper.dart';
 
 class RegisterController {
   final SupabaseClient _client = Supabase.instance.client;
@@ -57,10 +58,14 @@ class RegisterController {
       final determinedOrgId =
           selectedKelas ?? selectedKelompok ?? selectedDesa ?? selectedDaerah;
 
-      // 2. Upload Photo if exists
+      // 2. Upload Photo if exists (with Smart Compression)
       String? fotoUrl;
       if (fotoProfilFile != null) {
-        fotoUrl = await _uploadAvatar(fotoProfilFile);
+        final compressedFile = await ImageHelper.compressImage(
+          file: fotoProfilFile,
+          maxKiloBytes: 200,
+        );
+        fotoUrl = await _uploadAvatar(compressedFile);
       }
 
       // 3. Create User Model (With Hierarchy)

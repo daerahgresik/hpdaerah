@@ -1,6 +1,7 @@
 ﻿import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
+import 'package:hpdaerah/utils/image_helper.dart';
 
 class ProfileController {
   final SupabaseClient _client = Supabase.instance.client;
@@ -38,11 +39,15 @@ class ProfileController {
         updates['password'] = newPassword;
       }
 
-      // --- LOGIKA UPLOAD GAMBAR ---
+      // --- LOGIKA UPLOAD GAMBAR WITH COMPRESSION ---
       if (newImageFile != null) {
+        final compressedFile = await ImageHelper.compressImage(
+          file: newImageFile,
+          maxKiloBytes: 200,
+        );
         final imageUrl = await _uploadProfilePhoto(
           currentUser.id!,
-          newImageFile,
+          compressedFile,
         );
         updates['foto_profil'] = imageUrl;
       }

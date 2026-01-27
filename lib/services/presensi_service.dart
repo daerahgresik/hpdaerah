@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/presensi_model.dart';
 import '../models/user_model.dart';
+import '../utils/image_helper.dart';
 
 class PresensiService {
   final _client = Supabase.instance.client;
@@ -82,8 +83,14 @@ class PresensiService {
     required File imageFile,
   }) async {
     try {
-      // 1. Upload photo
-      final photoUrl = await _uploadIzinPhoto(userId, imageFile);
+      // 1. Compress image to max 200KB
+      final compressedFile = await ImageHelper.compressImage(
+        file: imageFile,
+        maxKiloBytes: 200,
+      );
+
+      // 2. Upload photo
+      final photoUrl = await _uploadIzinPhoto(userId, compressedFile);
 
       // 2. Record presence as 'izin'
       await _client.from('presensi').insert({

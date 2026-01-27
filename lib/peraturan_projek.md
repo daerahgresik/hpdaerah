@@ -337,3 +337,18 @@ Selain melalui Scan QR, Admin memiliki otoritas manual untuk mengubah status ang
 3.  **Alpha (Silang):** Memaksa status menjadi tidak hadir.
 
 *Setiap tindakan manual Admin akan mencatat `approved_by` dan metode `manual_admin` untuk audit.*
+
+---
+
+## 9. ATURAN MEDIA & PENYIMPANAN
+
+### A. Kompresi Foto Profil (Smart Compression)
+- **Aturan:** Setiap foto profil yang diunggah saat pendaftaran atau pembaruan profil **WAJIB** dikompresi secara otomatis oleh sistem.
+- **Batas Ukuran:** Maksimal ukuran file adalah **200 KB**.
+- **Tujuan:** Efisiensi storage Supabase, penghematan kuota pengguna, dan kecepatan loading daftar hadir/profil.
+- **Logika:** Sistem akan mendeteksi ukuran file, jika melebihi batas, maka kualitas dan dimensi akan diturunkan secara cerdas hingga di bawah 200 KB tanpa menghilangkan identitas visual.
+
+### B. Bukti Foto Izin (Real-time Evidence)
+- **Aturan:** Foto bukti untuk keperluan izin (Sakit, Kerja, dll) **WAJIB** diambil menggunakan kamera langsung melalui aplikasi.
+- **Larangan:** Tidak diperkenankan mengambil foto dari galeri/memori perangkat untuk mencegah manipulasi bukti atau penggunaan foto lama.
+- **Tujuan:** Menjamin keabsahan kehadiran dan alasan yang disampaikan pada saat kejadian berlangsung.
