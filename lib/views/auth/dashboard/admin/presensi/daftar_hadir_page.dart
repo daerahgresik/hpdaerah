@@ -2,6 +2,8 @@
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class DaftarHadirPage extends StatefulWidget {
   final UserModel adminUser;
@@ -589,38 +591,120 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
 
   void _showManualIzinDialog(Map<String, dynamic> item) async {
     final noteCtrl = TextEditingController();
-    final confirm = await showDialog<bool>(
+    File? selectedImage;
+    final picker = ImagePicker();
+    bool isSaving = false;
+
+    showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("Catat Izin: ${item['nama']}"),
-        content: TextField(
-          controller: noteCtrl,
-          decoration: const InputDecoration(
-            hintText: "Masukkan alasan izin...",
-          ),
-          maxLines: 2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Simpan"),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text("Catat Izin: ${item['nama']}"),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: noteCtrl,
+                    decoration: const InputDecoration(
+                      hintText: "Alasan izin...",
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Foto Bukti (Kamera)",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.camera,
+                        imageQuality: 50,
+                      );
+                      if (picked != null) {
+                        setDialogState(() {
+                          selectedImage = File(picked.path);
+                        });
+                      }
+                    },
+                    child: Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: selectedImage != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                selectedImage!,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : const Icon(Icons.camera_alt, color: Colors.grey),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                child: const Text("Batal"),
+              ),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (noteCtrl.text.isEmpty || selectedImage == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Alasan & Foto wajib diisi"),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => isSaving = true);
+                        try {
+                          await _presensiService.submitLeaveRequest(
+                            pengajianId: _selectedPengajianId!,
+                            userId: item['user_id'],
+                            keterangan: noteCtrl.text.trim(),
+                            imageFile: selectedImage!,
+                          );
+                          Navigator.pop(ctx);
+                          _loadAttendanceData();
+                        } catch (e) {
+                          setDialogState(() => isSaving = false);
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text("Gagal: $e")));
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text("Simpan"),
+              ),
+            ],
+          );
+        },
       ),
     );
-
-    if (confirm == true && noteCtrl.text.isNotEmpty) {
-      await _presensiService.recordManualIzin(
-        pengajianId: _selectedPengajianId!,
-        userId: item['user_id'],
-        keterangan: noteCtrl.text.trim(),
-      );
-      _loadAttendanceData();
-    }
   }
 
   Widget _buildEmptyState() {
