@@ -55,18 +55,20 @@ class _QrCodeTabState extends State<QrCodeTab> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        elevation: 0,
-        backgroundColor: const Color(0xFF1A5F2D),
-        foregroundColor: Colors.white,
         title: const Text(
           'QR Code Pengajian',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
+        backgroundColor: const Color(0xFF1A5F2D),
+        elevation: 0,
         centerTitle: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
+        toolbarHeight: 50, // Smaller AppBar
+        automaticallyImplyLeading: false,
+        foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<PengajianQr>>(
         stream: _qrStream,
@@ -104,7 +106,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
     return RefreshIndicator(
       onRefresh: () async => setState(() {}),
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: aktifList.length,
         itemBuilder: (context, index) {
           final qr = aktifList[index];
@@ -152,128 +154,119 @@ class _QrCodeTabState extends State<QrCodeTab> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Header with Gradient & Status
+          // Header - Micro Compact
           Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color(0xFF1A5F2D), const Color(0xFF2E7D42)],
+                colors: [Color(0xFF1A5F2D), Color(0xFF2E7D42)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
-            child: Column(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.mosque,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            qr.pengajianTitle ?? 'Pengajian',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "ID: ${qr.qrCode.toUpperCase()}",
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 10,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: statusColor.withValues(alpha: 0.5),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        qr.pengajianTitle ?? 'Pengajian',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(statusIcon, color: Colors.white, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            statusText,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        "ID: ${qr.qrCode.toUpperCase()}",
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 8,
+                          fontFamily: 'monospace',
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.5),
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, color: Colors.white, size: 8),
+                      const SizedBox(width: 2),
+                      Text(
+                        statusText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Main Info
+          // Main Info - Micro
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Column(
               children: [
-                _buildInfoRow(
-                  Icons.location_on,
-                  "Lokasi",
-                  qr.pengajianLocation ?? "Belum ditentukan",
-                  Colors.redAccent,
-                ),
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  Icons.access_time_filled,
-                  "Waktu",
-                  startTime != null ? _formatDateTime(startTime) : "-",
-                  Colors.blueAccent,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoRow(
+                        Icons.location_on,
+                        "Lokasi",
+                        qr.pengajianLocation ?? "-",
+                        Colors.redAccent,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildInfoRow(
+                        Icons.calendar_month,
+                        "Waktu",
+                        startTime != null ? _formatDateTime(startTime) : "-",
+                        Colors.blueAccent,
+                      ),
+                    ),
+                  ],
                 ),
                 if (qr.pengajianDescription != null &&
                     qr.pengajianDescription!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 2),
                   _buildInfoRow(
                     Icons.info,
                     "Keterangan",
@@ -285,98 +278,59 @@ class _QrCodeTabState extends State<QrCodeTab> {
             ),
           ),
 
-          const Divider(height: 40),
-
-          // Instruction Text
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              "Tunjukkan QR Code ini kepada Admin untuk melakukan presensi kehadiran.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-
-          // QR Code or Izin Status
+          // QR Code or Izin Status - Micro
           if (qr.presensiStatus == 'izin')
             Padding(
-              padding: const EdgeInsets.all(40),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[50],
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.assignment_late_outlined,
-                      size: 64,
-                      color: Colors.orange[400],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  Icon(Icons.check_circle, size: 32, color: Colors.green[600]),
                   const Text(
-                    "Anda Sudah Lapor Izin",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Status kehadiran Anda terdaftar sebagai IZIN untuk pengajian ini.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    "Anda Sudah Izin",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
             )
           else ...[
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                    ),
-                  ],
-                  border: Border.all(color: Colors.grey.shade100, width: 2),
-                ),
-                child: QrImageView(
-                  data: qr.qrCode,
-                  version: QrVersions.auto,
-                  size: 180,
-                  backgroundColor: Colors.white,
-                ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade100),
+              ),
+              child: QrImageView(
+                data: qr.qrCode,
+                version: QrVersions.auto,
+                size: 130, // Even smaller
+                backgroundColor: Colors.white,
               ),
             ),
-
-            // Lapor Izin Button
+            // Lapor Izin Button - Ultra Slim
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: OutlinedButton.icon(
-                onPressed: () => _showIzinDialog(qr),
-                icon: const Icon(Icons.assignment_late_outlined, size: 18),
-                label: const Text("Tidak bisa hadir? Lapor Izin"),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.orange[800],
-                  side: BorderSide(color: Colors.orange[300]!),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => _showIzinDialog(qr),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange[800],
+                    side: BorderSide(color: Colors.orange[300]!),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: const Text(
+                    "Lapor Izin",
+                    style: TextStyle(fontSize: 10),
                   ),
                 ),
               ),
             ),
           ],
-          const SizedBox(height: 16), // Padding bottom for the card
         ],
       ),
     );
@@ -384,27 +338,28 @@ class _QrCodeTabState extends State<QrCodeTab> {
 
   Widget _buildInfoRow(IconData icon, String label, String value, Color color) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 12),
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 9,
                   color: Colors.grey[500],
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
                 ),
               ),
               Text(
                 value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),
