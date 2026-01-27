@@ -83,7 +83,7 @@ class PresensiService {
     required File imageFile,
   }) async {
     try {
-      // 1. Compress image to max 200KB
+      // 1. Compress image to max 100KB (Leave Request Policy)
       final compressedFile = await ImageHelper.compressImage(
         file: imageFile,
         maxKiloBytes: 100,

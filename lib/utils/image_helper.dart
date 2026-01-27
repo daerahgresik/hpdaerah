@@ -8,7 +8,7 @@ class ImageHelper {
   /// Compress image file to be under maxKiloBytes
   static Future<File> compressImage({
     required File file,
-    int maxKiloBytes = 100, // Enforced 100KB limit
+    int maxKiloBytes = 200, // Default to 200KB (for profile), can be overridden
     int quality = 80,
   }) async {
     try {
