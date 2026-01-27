@@ -17,7 +17,6 @@ class PengajianService {
     required DateTime endedAt,
   }) async {
     try {
-      // Find any active room at the same org that overlaps with the requested time
       final response = await _client
           .from('pengajian')
           .select('id, title, started_at, ended_at')
@@ -27,46 +26,36 @@ class PengajianService {
       final List<dynamic> rooms = response as List<dynamic>;
 
       for (final room in rooms) {
-        final roomEndedAtStr = room['ended_at'] as String?;
         final roomStartedAtStr = room['started_at'] as String?;
+        if (roomStartedAtStr == null) continue;
 
-        if (roomEndedAtStr == null || roomStartedAtStr == null) continue;
-
-        final roomEndedAt = DateTime.parse(roomEndedAtStr);
         final roomStartedAt = DateTime.parse(roomStartedAtStr);
 
-        // Skip rooms that have already ended (in the past)
+        // Asumsi durasi default 3 jam jika ended_at null di database
+        final roomEndedAt = room['ended_at'] != null
+            ? DateTime.parse(room['ended_at'])
+            : roomStartedAt.add(const Duration(hours: 3));
+
+        // Skip jika room sudah berakhir di masa lalu
         if (roomEndedAt.isBefore(DateTime.now())) continue;
 
-        // Check for overlap:
-        // New room overlaps if: newStart < existingEnd AND newEnd > existingStart
+        // Strict Overlap Logic:
+        // Cek apakah rentang waktu bertabrakan
         final bool overlaps =
             startedAt.isBefore(roomEndedAt) && endedAt.isAfter(roomStartedAt);
 
         if (overlaps) {
-          // Calculate wait time
-          final waitDuration = roomEndedAt.difference(DateTime.now());
-          final waitMinutes = waitDuration.inMinutes;
-          final waitHours = waitDuration.inHours;
-
-          String waitMessage;
-          if (waitHours > 0) {
-            final remainingMinutes = waitMinutes % 60;
-            waitMessage =
-                "$waitHours jam ${remainingMinutes > 0 ? '$remainingMinutes menit' : ''}";
-          } else {
-            waitMessage = "$waitMinutes menit";
-          }
-
+          // Siapkan pesan tunggu
+          String waitMessage =
+              "hingga ${roomEndedAt.hour}:${roomEndedAt.minute}";
           return {
-            'title': room['title'] ?? 'Room',
+            'title': room['title'] ?? 'Room Lain',
             'ended_at': roomEndedAt,
             'wait_message': waitMessage,
           };
         }
       }
-
-      return null; // No overlap found
+      return null;
     } catch (e) {
       debugPrint("Error checking overlap: $e");
       return null;
@@ -75,20 +64,23 @@ class PengajianService {
 
   Future<void> createPengajian(Pengajian pengajian) async {
     try {
-      // 0. Check for overlapping rooms at the same org level
-      if (pengajian.endedAt != null) {
-        final overlap = await checkOverlappingRoom(
-          orgId: pengajian.orgId,
-          startedAt: pengajian.startedAt,
-          endedAt: pengajian.endedAt!,
-        );
+      // 0. Strict Overlap Check
+      // Walaupun endedAt null (default durasi), kita tetap validasi
+      final validationEndedAt =
+          pengajian.endedAt ??
+          pengajian.startedAt.add(const Duration(hours: 3));
 
-        if (overlap != null) {
-          throw Exception(
-            "Room '${overlap['title']}' sudah ada di waktu yang sama. "
-            "Silakan tunggu ${overlap['wait_message']} lagi untuk membuat room baru.",
-          );
-        }
+      final overlap = await checkOverlappingRoom(
+        orgId: pengajian.orgId,
+        startedAt: pengajian.startedAt,
+        endedAt: validationEndedAt,
+      );
+
+      if (overlap != null) {
+        throw Exception(
+          "GAGAL: Room '${overlap['title']}' sedang aktif di jam yang sama.\n"
+          "Anda tidak bisa membuat room ganda di tingkat/organisasi ini sampai room tersebut selesai (${overlap['wait_message']}).",
+        );
       }
 
       // 1. Generate Room Code if empty
@@ -239,7 +231,9 @@ class PengajianService {
     }
   }
 
-  Future<void> deletePengajian(String id) async {
+  // CLOSE ROOM (Tutup Pengajian - Selesai)
+  // Tidak menghapus data, tapi menandai selesai & absen Alpha
+  Future<void> closePengajian(String id) async {
     try {
       // 1. Ambil semua user yang belum presensi/izin di pengajian ini
       final unusedQRs = await _client
@@ -273,19 +267,35 @@ class PengajianService {
             .eq('is_used', false);
       }
 
-      // 4. Update pengajian set ended_at to a fixed past date
-      // This ensures it definitely disappears from 'Active Room' lists
-      // regardless of client timezones or small clock drifts.
+      // 4. Update pengajian set ended_at to NOW
       await _client
           .from('pengajian')
-          .update({'ended_at': DateTime.utc(1970).toIso8601String()})
+          .update({'ended_at': DateTime.now().toIso8601String()})
           .eq('id', id);
 
-      debugPrint(
-        'Pengajian $id closed and missing participants marked as Alpha',
-      );
+      debugPrint('Pengajian $id closed (Finished)');
     } catch (e) {
-      debugPrint("Error delete pengajian: $e");
+      debugPrint("Error close pengajian: $e");
+      rethrow;
+    }
+  }
+
+  // HARD DELETE (Hapus Permanen)
+  Future<void> deletePengajian(String id) async {
+    try {
+      // HARD DELETE PROPER
+      // 1. Hapus data presensi terkait
+      await _client.from('presensi').delete().eq('pengajian_id', id);
+
+      // 2. Hapus data QR terkait
+      await _client.from('pengajian_qr').delete().eq('pengajian_id', id);
+
+      // 3. Hapus Room Pengajian
+      await _client.from('pengajian').delete().eq('id', id);
+
+      debugPrint("Success Hard Delete Pengajian: $id");
+    } catch (e) {
+      debugPrint("Error Hard Delete: $e");
       rethrow;
     }
   }

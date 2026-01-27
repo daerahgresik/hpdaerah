@@ -1252,6 +1252,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Scanner
                           IconButton(
                             icon: const Icon(
                               Icons.qr_code_scanner,
@@ -1259,15 +1260,29 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                               size: 20,
                             ),
                             onPressed: () => _openScanner(item),
+                            tooltip: "Scan QR",
                             visualDensity: VisualDensity.compact,
                           ),
+                          // Finish (Selesai)
                           IconButton(
                             icon: const Icon(
-                              Icons.power_settings_new_rounded,
-                              color: Colors.red,
+                              Icons.check_circle_outline,
+                              color: Colors.orange,
                               size: 20,
                             ),
                             onPressed: () => _confirmCloseRoom(context, item),
+                            tooltip: "Selesaikan Pengajian",
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          // Delete (Hapus)
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            onPressed: () => _confirmDeleteRoom(context, item),
+                            tooltip: "Hapus Permanen",
                             visualDensity: VisualDensity.compact,
                           ),
                         ],
@@ -1283,13 +1298,56 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     );
   }
 
+  // CLOSE (Selesai Normal)
   Future<void> _confirmCloseRoom(BuildContext context, Pengajian item) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Tutup Room Pengajian?"),
+        title: const Text("Selesaikan Pengajian?"),
         content: Text(
-          "Pengajian '${item.title}' akan ditutup. Seluruh anggota yang belum absen akan otomatis dicatat sebagai TIDAK HADIR (Alpha).",
+          "Pengajian '${item.title}' akan ditandai SELESAI.\n"
+          "Anggota yang belum absen akan otomatis dicatat sebagai TIDAK HADIR (Alpha).",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Selesaikan"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _pengajianService.closePengajian(item.id);
+        if (context.mounted) {
+          _showStatusSnackBar("Room '${item.title}' telah selesai");
+          _updateActiveStream(); // Refresh UI
+        }
+      } catch (e) {
+        if (context.mounted) _showStatusSnackBar("Gagal: $e", isError: true);
+      }
+    }
+  }
+
+  // DELETE (Hapus Permanen - Fix Duplikat)
+  Future<void> _confirmDeleteRoom(BuildContext context, Pengajian item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Hapus Room Permanen?"),
+        content: Text(
+          "PERINGATAN: Room '${item.title}' akan DIHAPUS PERMANEN beserta seluruh data presensinya.\n\n"
+          "Gunakan ini jika Anda salah membuat room atau ingin menghapus room duplikat.",
+          style: const TextStyle(color: Colors.red),
         ),
         actions: [
           TextButton(
@@ -1302,7 +1360,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Tutup Sekarang"),
+            child: const Text("HAPUS SEKARANG"),
           ),
         ],
       ),
@@ -1312,18 +1370,12 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       try {
         await _pengajianService.deletePengajian(item.id);
         if (context.mounted) {
-          _showStatusSnackBar("Room '${item.title}' telah ditutup");
-          setState(() {
-            // Local force refresh in case stream is sluggish on Web
-            _updateActiveStream();
-          });
+          _showStatusSnackBar("Room berhasil dihapus permanen");
+          _updateActiveStream(); // Refresh UI
         }
       } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("Gagal menghapus: $e")));
-        }
+        if (context.mounted)
+          _showStatusSnackBar("Gagal menghapus: $e", isError: true);
       }
     }
   }
