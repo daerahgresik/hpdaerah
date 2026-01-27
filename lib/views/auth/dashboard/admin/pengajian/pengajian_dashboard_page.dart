@@ -467,35 +467,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const SizedBox(height: 48),
             ],
 
-            // INLINE SEARCH ROOM (JOIN LOGIC)
-            if (_showSearchRoom) ...[
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Text(
-                    "Cari & Gabung Room",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => setState(() {
-                      _showSearchRoom = false;
-                      _foundPengajian = null;
-                      _searchCodeCtrl.clear();
-                    }),
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildSearchRoomSection(context),
-              const SizedBox(height: 48),
-            ],
-
             // INLINE HISTORY ROOM (NEW)
             if (_showHistoryRoom) ...[
               const SizedBox(height: 24),
@@ -505,7 +476,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               ),
             ],
 
-            // INLINE KHATAMAN (UNDER CONSTRUCTION)
             if (_showKhataman) ...[
               const SizedBox(height: 24),
               const KhatamanPage(),
@@ -1021,6 +991,19 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
             ),
           ],
         ),
+
+        // SEARCH UI (Toggled from above)
+        if (_showSearchRoom) ...[
+          const SizedBox(height: 16),
+          _buildSearchRoomSection(context),
+          const SizedBox(height: 12),
+        ],
+
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Divider(),
+        ),
+
         StreamBuilder<List<Pengajian>>(
           stream: _activeRoomStream,
           builder: (context, snapshot) {
@@ -1648,8 +1631,12 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Anda akan mendaftarkan anggota organisasi Anda ke room:",
-                  style: TextStyle(color: Colors.grey[700]),
+                  "Anda akan mendaftarkan SELURUH anggota di bawah wewenang Anda ke pengajian ini. Setelah terdaftar, mereka akan otomatis memiliki QR Code untuk presensi di room ini.",
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -1672,8 +1659,11 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  "Pilih Target Anggota:",
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  "Kategori anggota yang dibawa:",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
@@ -1755,11 +1745,31 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Masukkan Kode Room",
-            style: TextStyle(fontWeight: FontWeight.w600),
+          Row(
+            children: [
+              const Icon(Icons.search, color: Colors.blueAccent, size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                "Cari & Join Pengajian Bersama",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.blueAccent,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+          Text(
+            "Masukkan kode room dari penyelenggara untuk membawa anggota Anda mendaftar ke sana.",
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Kode Room",
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
