@@ -243,16 +243,32 @@ class OrganizationService {
     if (path.isEmpty) return '';
 
     final typeLabels = {
-      'daerah': 'Daerah',
-      'desa': 'Desa',
-      'kelompok': 'Kelompok',
+      'daerah': 'Daerahmu',
+      'desa': 'Desamu',
+      'kelompok': 'Kelompokmu',
       'kategori_usia': '',
     };
 
     return path
         .map((org) {
           final label = typeLabels[org.type] ?? '';
-          return label.isNotEmpty ? '$label ${org.name}' : org.name;
+          if (label.isEmpty) return org.name;
+
+          // Cek apakah nama org sudah mengandung kata kunci (misal: "Desa ..." atau "Daerah ...")
+          // Jika iya, kita gunakan label "mu" tapi jangan sampai dobel "Desamu Desa"
+          final cleanName = org.name;
+          final rootLabel = label.replaceAll('mu', ''); // "Desa"
+
+          if (cleanName.toLowerCase().startsWith(rootLabel.toLowerCase())) {
+            // Jika nama sudah "Desa Timur", jadikan "Desamu Timur" atau tetap "Desa Timur" tapi labelnya mu?
+            // User minta "desamu", jadi kita ganti "Desa" di nama dengan "Desamu"
+            return cleanName.replaceFirst(
+              RegExp(rootLabel, caseSensitive: false),
+              label,
+            );
+          }
+
+          return '$label $cleanName';
         })
         .join(' • ');
   }
@@ -283,9 +299,9 @@ class OrganizationService {
     final currentOrg = path.last;
     final levelLabels = {
       0: 'Super Admin',
-      1: 'Admin Daerah',
-      2: 'Admin Desa',
-      3: 'Admin Kelompok',
+      1: 'Admin Daerahmu',
+      2: 'Admin Desamu',
+      3: 'Admin Kelompokmu',
       4: 'Admin Kategori',
     };
 
@@ -295,21 +311,41 @@ class OrganizationService {
     // Build subtitle berdasarkan path
     if (adminLevel == 1) {
       // Admin Daerah
-      title = 'Admin Daerah: ${currentOrg.name}';
+      title = 'Admin Daerahmu: ${currentOrg.name}';
       subtitle = '';
     } else if (adminLevel == 2 && path.length >= 2) {
       // Admin Desa
-      title = 'Admin Desa: ${currentOrg.name}';
-      subtitle = 'Daerah ${path[0].name}';
+      title = 'Admin Desamu: ${currentOrg.name}';
+      subtitle =
+          'Daerahmu ${path[0].name.replaceAll(RegExp(r'^Daerah ', caseSensitive: false), '')}';
     } else if (adminLevel == 3 && path.length >= 3) {
       // Admin Kelompok
-      title = 'Admin Kelompok: ${currentOrg.name}';
-      subtitle = 'Desa ${path[1].name} • Daerah ${path[0].name}';
+      title = 'Admin Kelompokmu: ${currentOrg.name}';
+      final desName = path[1].name.replaceAll(
+        RegExp(r'^Desa ', caseSensitive: false),
+        '',
+      );
+      final daeName = path[0].name.replaceAll(
+        RegExp(r'^Daerah ', caseSensitive: false),
+        '',
+      );
+      subtitle = 'Desamu $desName • Daerahmu $daeName';
     } else if (adminLevel == 4 && path.length >= 4) {
       // Admin Kategori
       title = 'Admin ${currentOrg.name}';
-      subtitle =
-          'Kelompok ${path[2].name} • Desa ${path[1].name} • Daerah ${path[0].name}';
+      final kelName = path[2].name.replaceAll(
+        RegExp(r'^Kelompok ', caseSensitive: false),
+        '',
+      );
+      final desName = path[1].name.replaceAll(
+        RegExp(r'^Desa ', caseSensitive: false),
+        '',
+      );
+      final daeName = path[0].name.replaceAll(
+        RegExp(r'^Daerah ', caseSensitive: false),
+        '',
+      );
+      subtitle = 'Kelompokmu $kelName • Desamu $desName • Daerahmu $daeName';
     }
 
     return {
