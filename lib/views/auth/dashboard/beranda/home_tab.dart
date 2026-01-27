@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/utils/menu_helper.dart';
+import 'package:hpdaerah/views/auth/dashboard/qrcode/qr_code_tab.dart';
 
 class HomeTab extends StatelessWidget {
   final UserModel user;
@@ -10,7 +11,10 @@ class HomeTab extends StatelessWidget {
   void _handleNavigation(BuildContext context, String route) {
     switch (route) {
       case '/qr-view':
-        _showSnackBar(context, "Menu QR View (Segera Hadir)");
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => QrCodeTab(user: user)),
+        );
         break;
       case '/riwayat':
         _showSnackBar(context, "Menu Riwayat (Segera Hadir)");
