@@ -102,9 +102,9 @@ class ProfileController {
           '${userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath = fileName;
 
-      // Upload ke Bucket 'avatars'
+      // Upload ke Bucket 'fotoprofil'
       await _client.storage
-          .from('avatars')
+          .from('fotoprofil')
           .upload(
             filePath,
             imageFile,
@@ -112,7 +112,9 @@ class ProfileController {
           );
 
       // Get Public URL
-      final imageUrl = _client.storage.from('avatars').getPublicUrl(filePath);
+      final imageUrl = _client.storage
+          .from('fotoprofil')
+          .getPublicUrl(filePath);
 
       return imageUrl;
     } catch (e) {

@@ -124,14 +124,14 @@ class RegisterController {
       final filePath = fileName;
 
       await _client.storage
-          .from('avatars')
+          .from('fotoprofil')
           .upload(
             filePath,
             imageFile,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
           );
 
-      return _client.storage.from('avatars').getPublicUrl(filePath);
+      return _client.storage.from('fotoprofil').getPublicUrl(filePath);
     } catch (e) {
       // If error, return null or throw. For now we throw.
       throw 'Gagal upload foto: $e';

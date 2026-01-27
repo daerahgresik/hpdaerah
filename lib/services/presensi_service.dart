@@ -120,17 +120,16 @@ class PresensiService {
           'izin_${userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath = fileName;
 
-      // We use 'avatars' bucket for now as it's already configured
-      // In a production app, we might want a separate 'presensi' bucket
+      // We use 'fotoprofil' bucket
       await _client.storage
-          .from('avatars')
+          .from('fotoprofil')
           .upload(
             filePath,
             imageFile,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
           );
 
-      return _client.storage.from('avatars').getPublicUrl(filePath);
+      return _client.storage.from('fotoprofil').getPublicUrl(filePath);
     } catch (e) {
       throw 'Gagal upload foto izin: $e';
     }
