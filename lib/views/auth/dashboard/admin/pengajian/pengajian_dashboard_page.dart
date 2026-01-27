@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_selector.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_page.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayatpengajian.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -28,6 +29,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   final _presensiService = PresensiService();
   bool _showCreateRoom = false;
   bool _showActiveRoom = false;
+  bool _showHistoryRoom = false; // New Menu State
   bool _showSearchRoom = false;
 
   // For Search Room logic
@@ -303,7 +305,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const SizedBox(height: 20),
             ],
 
-            // HORIZONTAL MENU ROW
+            // HORIZONTAL MENU ROW (4 Items)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -317,8 +319,13 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                     color: const Color(0xFF1A5F2D),
                     onTap: () {
                       setState(() {
-                        _showCreateRoom = !_showCreateRoom;
-                        _showActiveRoom = false;
+                        final newState = !_showCreateRoom;
+                        _showCreateRoom = newState;
+                        if (newState) {
+                          _showActiveRoom = false;
+                          _showHistoryRoom = false;
+                          _showSearchRoom = false;
+                        }
                       });
                     },
                     isActive: _showCreateRoom,
@@ -335,11 +342,40 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                     color: Colors.orange,
                     onTap: () {
                       setState(() {
-                        _showActiveRoom = !_showActiveRoom;
-                        _showCreateRoom = false;
+                        final newState = !_showActiveRoom;
+                        _showActiveRoom = newState;
+                        if (newState) {
+                          _showCreateRoom = false;
+                          _showHistoryRoom = false;
+                          _showSearchRoom = false;
+                        }
                       });
                     },
                     isActive: _showActiveRoom,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // RIWAYAT MENU
+                Expanded(
+                  child: _buildMenuCard(
+                    context,
+                    title: 'Riwayat',
+                    icon: _showHistoryRoom
+                        ? Icons.keyboard_arrow_up
+                        : Icons.history_edu,
+                    color: Colors.purple,
+                    onTap: () {
+                      setState(() {
+                        final newState = !_showHistoryRoom;
+                        _showHistoryRoom = newState;
+                        if (newState) {
+                          _showCreateRoom = false;
+                          _showActiveRoom = false;
+                          _showSearchRoom = false;
+                        }
+                      });
+                    },
+                    isActive: _showHistoryRoom,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -353,9 +389,13 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                     color: Colors.blueAccent,
                     onTap: () {
                       setState(() {
-                        _showSearchRoom = !_showSearchRoom;
-                        _showCreateRoom = false;
-                        _showActiveRoom = false;
+                        final newState = !_showSearchRoom;
+                        _showSearchRoom = newState;
+                        if (newState) {
+                          _showCreateRoom = false;
+                          _showActiveRoom = false;
+                          _showHistoryRoom = false;
+                        }
                       });
                     },
                     isActive: _showSearchRoom,
@@ -452,8 +492,20 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const SizedBox(height: 48),
             ],
 
+            // INLINE HISTORY ROOM (NEW)
+            if (_showHistoryRoom) ...[
+              const SizedBox(height: 24),
+              RiwayatPengajian(
+                user: widget.user,
+                orgId: _selectedOrgId ?? widget.orgId,
+              ),
+            ],
+
             // DEFAULT: Show Insight Dashboard when no menu is selected
-            if (!_showCreateRoom && !_showActiveRoom && !_showSearchRoom) ...[
+            if (!_showCreateRoom &&
+                !_showActiveRoom &&
+                !_showSearchRoom &&
+                !_showHistoryRoom) ...[
               const SizedBox(height: 24),
               _buildInsightDashboard(context),
             ],
