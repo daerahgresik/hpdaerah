@@ -59,6 +59,7 @@ class UserModel {
     this.adminLevel,
     this.adminOrgId,
     this.currentOrgId,
+    this.createdAt,
     this.updatedAt,
     this.keperluan,
     this.detailKeperluan,
