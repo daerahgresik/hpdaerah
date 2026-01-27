@@ -43,6 +43,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   late Stream<List<Pengajian>> _activeRoomStream;
   String? _lastStreamOrgId;
 
+  final FocusNode _searchFocus = FocusNode();
+
   String? _selectedOrgId;
   List<Map<String, dynamic>> _daerahList = [];
   bool _isFetchingDaerah = false;
@@ -962,31 +964,36 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               ),
             ),
             const Spacer(),
-            TextButton.icon(
+            ElevatedButton.icon(
               onPressed: () {
                 setState(() {
                   _showSearchRoom = !_showSearchRoom;
                   if (_showSearchRoom) {
-                    _showActiveRoom =
-                        true; // MUST show active room to see the search field
+                    _showActiveRoom = true;
                     _showKhataman = false;
                     _showHistoryRoom = false;
                     _showCreateRoom = false;
+                    _searchFocus.requestFocus();
                   }
                 });
               },
               icon: Icon(
                 _showSearchRoom ? Icons.close : Icons.search,
                 size: 16,
-                color: Colors.blue,
               ),
               label: Text(
-                _showSearchRoom ? "Tutup Cari" : "Cari Kode Room",
-                style: const TextStyle(fontSize: 11, color: Colors.blue),
+                _showSearchRoom ? "Tutup" : "Cari Room Bersama",
+                style: const TextStyle(fontSize: 11),
               ),
-              style: TextButton.styleFrom(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                foregroundColor: Colors.blue,
+                elevation: 0,
                 visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
             ),
           ],
@@ -1631,12 +1638,24 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Anda akan mendaftarkan SELURUH anggota di bawah wewenang Anda ke pengajian ini. Setelah terdaftar, mereka akan otomatis memiliki QR Code untuk presensi di room ini.",
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 13,
-                    height: 1.4,
+                  "Anda akan mendaftarkan anggota dari:",
+                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                ),
+                Text(
+                  widget.user.orgKelompokName ??
+                      widget.user.orgDesaName ??
+                      widget.user.orgDaerahName ??
+                      "Organisasi Anda",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                    fontSize: 15,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Ke dalam room pengajian bersama:",
+                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -1659,7 +1678,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  "Kategori anggota yang dibawa:",
+                  "Bawa Anggota Tingkat / Kategori:",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.indigo,
@@ -1775,16 +1794,20 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               Expanded(
                 child: TextField(
                   controller: _searchCodeCtrl,
+                  focusNode: _searchFocus,
                   textCapitalization: TextCapitalization.characters,
+                  autofocus: true,
                   decoration: InputDecoration(
-                    hintText: "Contoh: ABCDE1",
+                    hintText: "Masukkan Kode 6 Digit",
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
                     filled: true,
                     fillColor: Colors.grey[50],
                     isDense: true,
                   ),
+                  onSubmitted: (_) => _searchRoom(),
                 ),
               ),
               const SizedBox(width: 12),
