@@ -31,6 +31,7 @@ class PengajianQrService {
     required String pengajianId,
     required String targetOrgId,
     String? targetAudience,
+    String? creatorId, // New: always include creator
   }) async {
     try {
       // 1. Ambil semua user yang terdaftar di organisasi target
@@ -56,7 +57,14 @@ class PengajianQrService {
           .map((e) => e['user_id'].toString())
           .toSet();
 
-      final newTargetUsers = targetUsers
+      final List<String> finalTargetUserIds = targetUsers
+          .map((e) => e.toString())
+          .toList();
+      if (creatorId != null && !finalTargetUserIds.contains(creatorId)) {
+        finalTargetUserIds.add(creatorId);
+      }
+
+      final newTargetUsers = finalTargetUserIds
           .where((uid) => !existingUserIds.contains(uid))
           .toList();
 
@@ -137,15 +145,15 @@ class PengajianQrService {
           .map((o) => o['id'].toString())
           .toList();
 
-      // Now filter users in scope:
-      // Include if: User is an Admin OR User's current_org matches the category
+      // Include if: User's current_org matches the category
+      // Note: Admins are already in usersInScope. We no longer force every admin
+      // into every targeted room unless they are the creator (handled in parent)
+      // or they belong to the specific category.
       final List<String> targetUserIds = [];
       for (final u in usersInScope) {
-        final bool isAdmin = u['is_admin'] == true;
         final String? userOrg = u['current_org_id']?.toString();
 
-        if (isAdmin ||
-            (userOrg != null && validOrgIdsForCategory.contains(userOrg))) {
+        if ((userOrg != null && validOrgIdsForCategory.contains(userOrg))) {
           targetUserIds.add(u['id'].toString());
         }
       }

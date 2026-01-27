@@ -4,6 +4,8 @@ import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/models/materi_model.dart';
 import 'package:hpdaerah/services/materi_service.dart';
+import 'package:hpdaerah/services/organization_service.dart';
+import 'package:hpdaerah/models/organization_model.dart';
 
 class PengajianLevelSelector extends StatefulWidget {
   final UserModel user;
@@ -24,6 +26,7 @@ class PengajianLevelSelector extends StatefulWidget {
 class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
   final _pengajianService = PengajianService();
   final _materiService = MateriService();
+  final _orgService = OrganizationService();
   late Stream<List<Pengajian>> _templatesStream;
 
   @override
@@ -306,7 +309,40 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
       DateTime.now().add(const Duration(hours: 1)),
     );
 
-    // Dynamic lists for Guru & Materi
+    // Audience selection
+    final audienceOptions = ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit'];
+    String selectedAudience = template.targetAudience ?? 'Semua';
+    if (!audienceOptions.contains(selectedAudience)) {
+      if (selectedAudience == 'Muda-mudi') {
+        selectedAudience = 'Muda - mudi';
+      } else {
+        selectedAudience = 'Semua';
+      }
+    }
+
+    // Sub-organization selection
+    String? selectedSubOrgId;
+    List<Organization> subOrgs = [];
+    bool isLoadingSubOrgs = false;
+    bool needsSubOrg =
+        template.level != null && template.level! >= widget.adminLevel;
+
+    // Fetch sub-orgs if needed
+    if (needsSubOrg) {
+      isLoadingSubOrgs = true;
+      _orgService
+          .fetchChildren(widget.orgId)
+          .then((list) {
+            subOrgs = list;
+            isLoadingSubOrgs = false;
+            // Optionally auto-select if only one
+            // if (subOrgs.length == 1) selectedSubOrgId = subOrgs.first.id;
+          })
+          .catchError((e) {
+            debugPrint("Error fetching sub-orgs: $e");
+          });
+    }
+
     final List<Map<String, TextEditingController>> materiEntries = [
       {'guru': TextEditingController(), 'isi': TextEditingController()},
     ];
@@ -325,14 +361,105 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 children: [
                   _buildDetailRow("Nama", template.title),
                   _buildDetailRow("Lokasi", template.location ?? '-'),
-                  _buildDetailRow(
-                    "Target",
-                    (template.targetAudience?.isNotEmpty == true)
-                        ? template.targetAudience!
-                        : 'Semua (Default)',
-                  ),
                   _buildDetailRow("Deskripsi", template.description ?? '-'),
-                  const Divider(height: 24),
+                  const SizedBox(height: 16),
+
+                  // 1. SELECT TARGET AUDIENCE
+                  const Text(
+                    "Target Peserta:",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedAudience,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                    items: audienceOptions
+                        .map(
+                          (val) =>
+                              DropdownMenuItem(value: val, child: Text(val)),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null)
+                        setStateDialog(() => selectedAudience = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. SELECT TARGET WILAYAH (SUBO-ORG)
+                  if (needsSubOrg) ...[
+                    const Text(
+                      "Wilayah Target (Sub-Organisasi):",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (isLoadingSubOrgs)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else if (subOrgs.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          "Tidak ada sub-organisasi ditemukan. Pengajian akan dibuat di level ini.",
+                          style: TextStyle(fontSize: 12, color: Colors.orange),
+                        ),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: selectedSubOrgId,
+                        hint: const Text("Pilih Sub-Organisasi"),
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.green[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.green.shade200,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        items: subOrgs
+                            .map(
+                              (org) => DropdownMenuItem(
+                                value: org.id,
+                                child: Text(org.name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) {
+                          setStateDialog(() => selectedSubOrgId = val);
+                        },
+                      ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Waktu Pelaksanaan (Mulai - Selesai)
                   const Text(
@@ -593,24 +720,46 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                       selectedEndTime.minute,
                     );
 
+                    // Hierarchical context resolution
+                    String targetOrgId = selectedSubOrgId ?? widget.orgId;
+                    String? orgDaerahId = widget.user.orgDaerahId;
+                    String? orgDesaId = widget.user.orgDesaId;
+                    String? orgKelompokId = widget.user.orgKelompokId;
+
+                    // If a sub-org was selected, we need to update the hierarchy IDs
+                    if (selectedSubOrgId != null) {
+                      final selectedOrg = subOrgs.firstWhere(
+                        (o) => o.id == selectedSubOrgId,
+                      );
+                      // Determine which level of ID to update
+                      if (selectedOrg.type == 'daerah') {
+                        orgDaerahId = selectedOrg.id;
+                      } else if (selectedOrg.type == 'desa') {
+                        orgDesaId = selectedOrg.id;
+                      } else if (selectedOrg.type == 'kelompok') {
+                        orgKelompokId = selectedOrg.id;
+                        // If we pick a Kelompok, the parent is the Desa
+                        orgDesaId = selectedOrg.parentId;
+                      }
+                    }
+
                     // Buat Pengajian dari Template
                     await _pengajianService.createPengajian(
                       Pengajian(
                         id: '',
-                        orgId: widget.orgId,
+                        orgId: targetOrgId,
                         title: template.title,
                         description: template.description,
                         location: template.location,
-                        targetAudience: template.targetAudience,
+                        targetAudience: selectedAudience,
                         roomCode: roomCodeController.text.trim().toUpperCase(),
                         isTemplate: false,
                         startedAt: combinedStartTime,
-                        endedAt: combinedEndTime, // SIMPAN END TIME
+                        endedAt: combinedEndTime,
                         level: template.level,
-                        // Full hierarchical context
-                        orgDaerahId: widget.user.orgDaerahId,
-                        orgDesaId: widget.user.orgDesaId,
-                        orgKelompokId: widget.user.orgKelompokId,
+                        orgDaerahId: orgDaerahId,
+                        orgDesaId: orgDesaId,
+                        orgKelompokId: orgKelompokId,
                       ),
                     );
 

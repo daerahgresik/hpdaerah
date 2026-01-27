@@ -2,6 +2,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Import ini
 import 'package:hpdaerah/views/landing_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
 import 'package:hpdaerah/services/auth_service.dart';
@@ -9,6 +10,10 @@ import 'package:hpdaerah/services/auth_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+
+  // Initialize Date Formatting
+  await initializeDateFormatting('id_ID', null); // Inisialisasi Lokal
+
   await Supabase.initialize(
     url: dotenv.env['NEXT_PUBLIC_SUPABASE_URL']!,
     anonKey: dotenv.env['NEXT_PUBLIC_SUPABASE_ANON_KEY']!,

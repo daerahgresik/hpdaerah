@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/user_model.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/rekap_pengajian_page.dart'; // Import ini
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
@@ -297,85 +298,100 @@ class _RiwayatPengajianState extends State<RiwayatPengajian> {
   }
 
   Widget _buildEventCard(Pengajian item) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RekapPengajianPage(pengajian: item),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Icon Box
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            child: const Icon(
-              Icons.check_circle_outline,
-              color: Color(0xFF1A5F2D),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icon Box
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: Color(0xFF1A5F2D),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 12, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      "${_formatTime(item.startedAt)} - ${item.endedAt != null ? _formatTime(item.endedAt!) : '?'}",
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            const SizedBox(width: 16),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
-                  ],
-                ),
-                if (item.location != null) ...[
-                  const SizedBox(height: 2),
+                  ),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
-                        Icons.location_on,
+                        Icons.access_time,
                         size: 12,
                         color: Colors.grey[600],
                       ),
                       const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          item.location!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      Text(
+                        "${_formatTime(item.startedAt)} - ${item.endedAt != null ? _formatTime(item.endedAt!) : '?'}",
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
+                  if (item.location != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 12,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            item.location!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

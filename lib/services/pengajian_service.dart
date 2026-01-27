@@ -118,11 +118,25 @@ class PengajianService {
       final newPengajianId = response['id'] as String;
       debugPrint("Created Room with Code: $roomCode");
 
-      // 2. Initial targeting for the creator's org
+      // 2. Determine target organization based on level
+      // If room level is Daerah (0), use orgDaerahId, etc.
+      // This ensures "tingkat daerah maka targetnya di sesuaikan" requirement is met.
+      String effectiveTargetOrgId = pengajian.orgId;
+      if (pengajian.level == 0 && pengajian.orgDaerahId != null) {
+        effectiveTargetOrgId = pengajian.orgDaerahId!;
+      } else if (pengajian.level == 1 && pengajian.orgDesaId != null) {
+        effectiveTargetOrgId = pengajian.orgDesaId!;
+      } else if (pengajian.level == 2 && pengajian.orgKelompokId != null) {
+        effectiveTargetOrgId = pengajian.orgKelompokId!;
+      }
+
+      final creatorId = _client.auth.currentUser?.id;
+
       await _qrService.generateQrForTargetUsers(
         pengajianId: newPengajianId,
-        targetOrgId: pengajian.orgId,
+        targetOrgId: effectiveTargetOrgId,
         targetAudience: pengajian.targetAudience,
+        creatorId: creatorId,
       );
     } catch (e) {
       debugPrint("Error Create Pengajian: $e");
@@ -168,11 +182,13 @@ class PengajianService {
     String? targetAudience,
   }) async {
     try {
+      final creatorId = _client.auth.currentUser?.id;
       // Create QR records for members of this new joining org
       await _qrService.generateQrForTargetUsers(
         pengajianId: pengajianId,
         targetOrgId: targetOrgId,
         targetAudience: targetAudience,
+        creatorId: creatorId,
       );
     } catch (e) {
       rethrow;
@@ -356,95 +372,117 @@ class PengajianService {
         .order('started_at', ascending: false) // Fetch NEWEST first
         .limit(50) // Limit to 50 active rooms to prevent overload
         .map((data) {
-          final list = List.from(data as Iterable);
-          final typedData = list
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+          try {
+            final list = List.from(data as Iterable);
+            final typedData = list
+                .map((e) {
+                  try {
+                    return Map<String, dynamic>.from(e as Map);
+                  } catch (e) {
+                    debugPrint("Error parsing pengajian row: $e");
+                    return null;
+                  }
+                })
+                .whereType<Map<String, dynamic>>()
+                .toList();
 
-          final currentUserId = _client.auth.currentUser?.id;
-          final nowUtc = DateTime.now().toUtc();
+            final currentUserId = _client.auth.currentUser?.id;
 
-          final filtered = typedData
-              .where((json) {
-                // Server side already handled is_template, but safe to keep check
+            final filtered = typedData
+                .where((json) {
+                  // 1. Status Check: SHOW IF ACTIVE (no ended_at) OR STARTED TODAY
+                  final startedAtStr = json['started_at'] as String?;
+                  final endedAtStr = json['ended_at'] as String?;
+                  if (startedAtStr == null) return false;
 
-                // 1. Date Check: ONLY SHOW ROOMS FOR TODAY (Active, Upcoming, Finished)
-                final startedAtStr = json['started_at'] as String?;
-                if (startedAtStr == null) return false;
+                  try {
+                    final startedAt = DateTime.parse(startedAtStr).toLocal();
+                    final now = DateTime.now();
 
-                try {
-                  final startedAt = DateTime.parse(startedAtStr).toLocal();
-                  final now = DateTime.now();
+                    // Check if it is the same day as today
+                    final isToday =
+                        startedAt.year == now.year &&
+                        startedAt.month == now.month &&
+                        startedAt.day == now.day;
 
-                  // Check if it is the same day as today
-                  final isToday =
-                      startedAt.year == now.year &&
-                      startedAt.month == now.month &&
-                      startedAt.day == now.day;
+                    final isActive = endedAtStr == null;
 
-                  if (!isToday) return false;
-                } catch (_) {
+                    // Show if it's still active OR it started today (even if finished)
+                    if (!isActive && !isToday) return false;
+                  } catch (e) {
+                    debugPrint(
+                      "Error parsing date in streamActivePengajian: $e",
+                    );
+                    return false;
+                  }
+
+                  // 2. Hierarchical & Permission Visibility
+                  final jsonOrgId = json['org_id'];
+                  final createdBy = json['created_by'];
+                  final jsonDaerahId = json['org_daerah_id'];
+                  final jsonDesaId = json['org_desa_id'];
+                  final jsonKelompokId = json['org_kelompok_id'];
+
+                  // Rule A: Super Admin sees everything
+                  if (admin.adminLevel == 0) return true;
+
+                  // Rule B: Creator always sees their own (Priority)
+                  if (currentUserId != null && createdBy == currentUserId) {
+                    return true;
+                  }
+
+                  // Rule C: Territory Match
+                  final myOrgId = admin.adminOrgId;
+                  if (myOrgId != null) {
+                    // Admin Daerah specific: Show room if org_daerah_id matches my org
+                    if (admin.adminLevel == 1 &&
+                        (jsonOrgId == myOrgId || jsonDaerahId == myOrgId)) {
+                      return true;
+                    }
+                    if (admin.adminLevel == 2 &&
+                        (jsonOrgId == myOrgId || jsonDesaId == myOrgId)) {
+                      return true;
+                    }
+                    if (admin.adminLevel == 3 &&
+                        (jsonOrgId == myOrgId || jsonKelompokId == myOrgId)) {
+                      return true;
+                    }
+                  }
+
+                  // Rule D: Filter by Selected Org (If user selected specific filter)
+                  if (selectedOrgId.isNotEmpty && selectedOrgId != myOrgId) {
+                    if (jsonOrgId == selectedOrgId ||
+                        jsonDaerahId == selectedOrgId ||
+                        jsonDesaId == selectedOrgId ||
+                        jsonKelompokId == selectedOrgId) {
+                      return true;
+                    }
+                  } else if (selectedOrgId.isNotEmpty &&
+                      selectedOrgId == myOrgId) {
+                    return true;
+                  }
+
                   return false;
-                }
-
-                // 2. Hierarchical & Permission Visibility
-                final jsonOrgId = json['org_id'];
-                final createdBy = json['created_by'];
-                final jsonDaerahId = json['org_daerah_id'];
-                final jsonDesaId = json['org_desa_id'];
-                final jsonKelompokId = json['org_kelompok_id'];
-
-                // Rule A: Super Admin sees everything
-                if (admin.adminLevel == 0) return true;
-
-                // Rule B: Creator always sees their own (Priority)
-                if (currentUserId != null && createdBy == currentUserId) {
-                  return true;
-                }
-
-                // Rule C: Territory Match
-                final myOrgId = admin.adminOrgId;
-                if (myOrgId != null) {
-                  // Admin Daerah specific: Show room if org_daerah_id matches my org
-                  if (admin.adminLevel == 1 &&
-                      (jsonOrgId == myOrgId || jsonDaerahId == myOrgId)) {
-                    return true;
+                })
+                .map((json) {
+                  try {
+                    return Pengajian.fromJson(json);
+                  } catch (e) {
+                    debugPrint("Error in Pengajian.fromJson: $e");
+                    return null;
                   }
-                  if (admin.adminLevel == 2 &&
-                      (jsonOrgId == myOrgId || jsonDesaId == myOrgId)) {
-                    return true;
-                  }
-                  if (admin.adminLevel == 3 &&
-                      (jsonOrgId == myOrgId || jsonKelompokId == myOrgId)) {
-                    return true;
-                  }
-                }
+                })
+                .whereType<Pengajian>()
+                .toList();
 
-                // Rule D: Filter by Selected Org (If user selected specific filter)
-                if (selectedOrgId.isNotEmpty && selectedOrgId != myOrgId) {
-                  // Only apply this strict filter if it's different from my own org
-                  // (e.g. Admin Daerah filtering for specific Desa)
-                  if (jsonOrgId == selectedOrgId ||
-                      jsonDaerahId == selectedOrgId ||
-                      jsonDesaId == selectedOrgId ||
-                      jsonKelompokId == selectedOrgId) {
-                    return true;
-                  }
-                } else if (selectedOrgId.isNotEmpty &&
-                    selectedOrgId == myOrgId) {
-                  // If filter is my own org, we already handled it in Rule C
-                  return true;
-                }
+            // Sort Client Side: ASCENDING for display (Soonest first)
+            filtered.sort((a, b) => a.startedAt.compareTo(b.startedAt));
 
-                return false;
-              })
-              .map((json) => Pengajian.fromJson(json))
-              .toList();
-
-          // Sort Client Side: ASCENDING for display (Soonest first)
-          filtered.sort((a, b) => a.startedAt.compareTo(b.startedAt));
-
-          return filtered;
+            return filtered;
+          } catch (e) {
+            debugPrint("Critical error in streamActivePengajian mapper: $e");
+            return <Pengajian>[];
+          }
         });
   }
 }
