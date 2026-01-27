@@ -253,76 +253,106 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
     bool isIzin = status == 'izin';
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
         border: Border.all(
           color: isHadir
-              ? Colors.green.withValues(alpha: 0.3)
+              ? const Color(0xFF1A5F2D).withValues(alpha: 0.2)
               : isIzin
-              ? Colors.orange.withValues(alpha: 0.3)
+              ? Colors.amber.withValues(alpha: 0.2)
               : Colors.grey.shade100,
+          width: 1.5,
         ),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: CircleAvatar(
-          backgroundColor: Colors.grey[200],
-          backgroundImage: item['foto_profil'] != null
-              ? NetworkImage(item['foto_profil'])
-              : null,
-          child: item['foto_profil'] == null
-              ? const Icon(Icons.person, color: Colors.grey)
-              : null,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.grey.shade200, width: 2),
+          ),
+          child: CircleAvatar(
+            backgroundColor: Colors.grey[100],
+            backgroundImage: item['foto_profil'] != null
+                ? NetworkImage(item['foto_profil'])
+                : null,
+            child: item['foto_profil'] == null
+                ? const Icon(Icons.person, color: Colors.blueGrey)
+                : null,
+          ),
         ),
         title: Text(
           item['nama'] ?? '-',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: Colors.black87,
+          ),
         ),
-        subtitle: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                statusLabel,
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusLabel.toUpperCase(),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                item['kelompok'] ?? item['desa'] ?? '-',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item['kelompok'] ?? item['desa'] ?? '-',
+                  style: TextStyle(fontSize: 11, color: Colors.blueGrey[400]),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             // TOMBOL IZIN
             _buildActionButton(
-              icon: Icons.info_outline,
-              color: isIzin ? Colors.orange : Colors.grey.shade400,
+              icon: Icons.info_rounded,
+              color: isIzin ? Colors.amber.shade700 : Colors.blueGrey.shade200,
+              bgColor: isIzin
+                  ? Colors.amber.shade50
+                  : Colors.blueGrey.shade50.withValues(alpha: 0.5),
               onTap: () => _showIzinDialog(item),
               isActive: isIzin,
               tooltip: "Proses Izin",
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             // TOMBOL HADIR
             _buildActionButton(
-              icon: Icons.check_circle,
-              color: isHadir ? Colors.green : Colors.grey.shade400,
+              icon: Icons.check_circle_rounded,
+              color: isHadir
+                  ? const Color(0xFF1A5F2D)
+                  : Colors.blueGrey.shade200,
+              bgColor: isHadir
+                  ? const Color(0xFF1A5F2D).withValues(alpha: 0.1)
+                  : Colors.blueGrey.shade50.withValues(alpha: 0.5),
               onTap: () =>
                   _updateStatus(item, isHadir ? 'tidak_hadir' : 'hadir'),
               isActive: isHadir,
@@ -337,24 +367,32 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   Widget _buildActionButton({
     required IconData icon,
     required Color color,
+    required Color bgColor,
     required VoidCallback onTap,
     required bool isActive,
     required String tooltip,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Tooltip(
-        message: tooltip,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: color.withValues(alpha: isActive ? 0.5 : 0.2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Tooltip(
+          message: tooltip,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isActive
+                    ? color.withValues(alpha: 0.3)
+                    : Colors.grey.shade200,
+                width: 1,
+              ),
             ),
+            child: Icon(icon, color: color, size: 24),
           ),
-          child: Icon(icon, color: color, size: 22),
         ),
       ),
     );
