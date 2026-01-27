@@ -15,8 +15,15 @@ class ManualPresenceSheet extends StatefulWidget {
 class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   final _presensiService = PresensiService();
   final _picker = ImagePicker();
+  final _searchCtrl = TextEditingController();
   String _searchQuery = "";
   bool _isProcessing = false;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +89,27 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // Search Field (Permanent)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              style: const TextStyle(color: Colors.black87),
+              decoration: InputDecoration(
+                hintText: "Cari nama jamaah...",
+                prefixIcon: const Icon(Icons.search, size: 20),
+                filled: true,
+                fillColor: Colors.grey[100],
+                contentPadding: EdgeInsets.zero,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
             ),
           ),
 
@@ -165,29 +193,6 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                                   ),
                                 ),
                               ],
-                            ),
-                          ),
-                        ),
-
-                        // Search Field
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          child: TextField(
-                            onChanged: (val) =>
-                                setState(() => _searchQuery = val),
-                            decoration: InputDecoration(
-                              hintText: "Cari nama jamaah...",
-                              prefixIcon: const Icon(Icons.search, size: 20),
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                              contentPadding: EdgeInsets.zero,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
                             ),
                           ),
                         ),
