@@ -337,10 +337,14 @@ class PengajianService {
     UserModel admin,
     String selectedOrgId,
   ) {
+    // Optimization: Filter server-side to reduce data load and hit limit
+    // Also order by started_at DESCENDING to get the LATEST rooms first (avoid 100 limit on old data)
     return _client
         .from('pengajian')
         .stream(primaryKey: ['id'])
-        .order('started_at')
+        .eq('is_template', false)
+        .order('started_at', ascending: false) // Fetch NEWEST first
+        .limit(50) // Limit to 50 active rooms to prevent overload
         .map((data) {
           final list = List.from(data as Iterable);
           final typedData = list
@@ -348,28 +352,32 @@ class PengajianService {
               .toList();
 
           final currentUserId = _client.auth.currentUser?.id;
+          final nowUtc = DateTime.now().toUtc();
 
-          return typedData
+          final filtered = typedData
               .where((json) {
-                // 1. Template Check
-                if (json['is_template'] == true) return false;
+                // Server side already handled is_template, but safe to keep check
 
-                // 2. End Status Check
-                final endedAtStr = json['ended_at'] as String?;
-                if (endedAtStr != null) {
-                  try {
-                    final endedAt = DateTime.parse(endedAtStr).toUtc();
-                    final nowUtc = DateTime.now().toUtc();
-                    // If room has an end date, hide it if that date has passed
-                    if (endedAt.isBefore(nowUtc)) {
-                      return false;
-                    }
-                  } catch (_) {
-                    return false;
-                  }
+                // 1. Date Check: ONLY SHOW ROOMS FOR TODAY (Active, Upcoming, Finished)
+                final startedAtStr = json['started_at'] as String?;
+                if (startedAtStr == null) return false;
+
+                try {
+                  final startedAt = DateTime.parse(startedAtStr).toLocal();
+                  final now = DateTime.now();
+
+                  // Check if it is the same day as today
+                  final isToday =
+                      startedAt.year == now.year &&
+                      startedAt.month == now.month &&
+                      startedAt.day == now.day;
+
+                  if (!isToday) return false;
+                } catch (_) {
+                  return false;
                 }
 
-                // 3. Hierarchical Visibility Logic
+                // 2. Hierarchical & Permission Visibility
                 final jsonOrgId = json['org_id'];
                 final createdBy = json['created_by'];
                 final jsonDaerahId = json['org_daerah_id'];
@@ -377,13 +385,17 @@ class PengajianService {
                 final jsonKelompokId = json['org_kelompok_id'];
 
                 // Rule A: Super Admin sees everything
-                if (admin.adminLevel == 0) {
+                if (admin.adminLevel == 0) return true;
+
+                // Rule B: Creator always sees their own (Priority)
+                if (currentUserId != null && createdBy == currentUserId) {
                   return true;
                 }
 
-                // Rule B: Territory Match (The Core Fix for Admin Daerah)
+                // Rule C: Territory Match
                 final myOrgId = admin.adminOrgId;
                 if (myOrgId != null) {
+                  // Admin Daerah specific: Show room if org_daerah_id matches my org
                   if (admin.adminLevel == 1 &&
                       (jsonOrgId == myOrgId || jsonDaerahId == myOrgId)) {
                     return true;
@@ -398,18 +410,19 @@ class PengajianService {
                   }
                 }
 
-                // Rule C: Selected Org View
-                if (selectedOrgId.isNotEmpty) {
+                // Rule D: Filter by Selected Org (If user selected specific filter)
+                if (selectedOrgId.isNotEmpty && selectedOrgId != myOrgId) {
+                  // Only apply this strict filter if it's different from my own org
+                  // (e.g. Admin Daerah filtering for specific Desa)
                   if (jsonOrgId == selectedOrgId ||
                       jsonDaerahId == selectedOrgId ||
                       jsonDesaId == selectedOrgId ||
                       jsonKelompokId == selectedOrgId) {
                     return true;
                   }
-                }
-
-                // Rule D: Creator always sees their own
-                if (currentUserId != null && createdBy == currentUserId) {
+                } else if (selectedOrgId.isNotEmpty &&
+                    selectedOrgId == myOrgId) {
+                  // If filter is my own org, we already handled it in Rule C
                   return true;
                 }
 
@@ -417,6 +430,11 @@ class PengajianService {
               })
               .map((json) => Pengajian.fromJson(json))
               .toList();
+
+          // Sort Client Side: ASCENDING for display (Soonest first)
+          filtered.sort((a, b) => a.startedAt.compareTo(b.startedAt));
+
+          return filtered;
         });
   }
 }

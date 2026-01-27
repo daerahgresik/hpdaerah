@@ -999,13 +999,79 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(
-                                    item.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Builder(
+                                        builder: (context) {
+                                          final now = DateTime.now();
+                                          final start = item.startedAt
+                                              .toLocal();
+                                          final end = item.endedAt?.toLocal();
+
+                                          String label;
+                                          Color color;
+
+                                          if (end != null && now.isAfter(end)) {
+                                            label = "SELESAI";
+                                            color = Colors.grey;
+                                          } else if (now.isBefore(start)) {
+                                            final diff = start.difference(now);
+                                            final prefix = diff.inHours > 0
+                                                ? "${diff.inHours} JAM"
+                                                : "${diff.inMinutes + 1} MENIT";
+                                            label =
+                                                "AKAN DATANG ($prefix LAGI)";
+                                            color = Colors.orange;
+                                          } else {
+                                            final diff = end != null
+                                                ? end.difference(now).inMinutes
+                                                : 0;
+                                            label =
+                                                "SEDANG BERLANGSUNG${diff > 0 ? ' • SISA ${diff}m' : ''}";
+                                            color = const Color(0xFF1A5F2D);
+                                          }
+
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: color.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: color.withValues(
+                                                  alpha: 0.3,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              label,
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: color,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 if (item.roomCode != null)
