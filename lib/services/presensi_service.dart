@@ -86,7 +86,7 @@ class PresensiService {
       // 1. Compress image to max 200KB
       final compressedFile = await ImageHelper.compressImage(
         file: imageFile,
-        maxKiloBytes: 200,
+        maxKiloBytes: 100,
       );
 
       // 2. Upload photo

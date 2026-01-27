@@ -63,7 +63,7 @@ class RegisterController {
       if (fotoProfilFile != null) {
         final compressedFile = await ImageHelper.compressImage(
           file: fotoProfilFile,
-          maxKiloBytes: 200,
+          maxKiloBytes: 100,
         );
         fotoUrl = await _uploadAvatar(compressedFile);
       }

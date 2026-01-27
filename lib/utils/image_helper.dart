@@ -8,8 +8,8 @@ class ImageHelper {
   /// Compress image file to be under maxKiloBytes
   static Future<File> compressImage({
     required File file,
-    int maxKiloBytes = 200,
-    int quality = 85,
+    int maxKiloBytes = 100, // Enforced 100KB limit
+    int quality = 80,
   }) async {
     try {
       final originSize = await file.length();
@@ -21,59 +21,53 @@ class ImageHelper {
       debugPrint('Compressing image: ${originSize / 1024} KB');
 
       final dir = await path_provider.getTemporaryDirectory();
-      final targetPath = p.join(
-        dir.absolute.path,
-        'temp_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
+      var currentWidth = 1024;
+      var currentHeight = 1024;
 
-      // Start with initial quality
-      var result = await FlutterImageCompress.compressAndGetFile(
-        file.absolute.path,
-        targetPath,
-        quality: quality,
-        format: CompressFormat.jpeg,
-        minWidth: 1024,
-        minHeight: 1024,
-      );
+      File? compressedFile;
+      var compressedSize = originSize;
 
-      if (result == null) return file;
-
-      var compressedFile = File(result.path);
-      var compressedSize = await compressedFile.length();
-
-      // If still too large, loop with decreasing quality
-      while (compressedSize > maxKiloBytes * 1024 && quality > 10) {
-        quality -= 10;
-        debugPrint(
-          'Still too large: ${compressedSize / 1024} KB. Retrying with quality $quality',
-        );
-
-        // Delete previous temp file
-        if (await compressedFile.exists()) {
-          await compressedFile.delete();
-        }
-
-        final newTargetPath = p.join(
+      // Smart Iterative Compression
+      while (compressedSize > maxKiloBytes * 1024 && quality > 5) {
+        final targetPath = p.join(
           dir.absolute.path,
-          'temp_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          'comp_${DateTime.now().millisecondsSinceEpoch}.jpg',
         );
 
-        result = await FlutterImageCompress.compressAndGetFile(
+        final result = await FlutterImageCompress.compressAndGetFile(
           file.absolute.path,
-          newTargetPath,
+          targetPath,
           quality: quality,
           format: CompressFormat.jpeg,
-          minWidth: 800,
-          minHeight: 800,
+          minWidth: currentWidth,
+          minHeight: currentHeight,
         );
 
         if (result == null) break;
+
+        // Clean up previous temp file
+        if (compressedFile != null && await compressedFile.exists()) {
+          await compressedFile.delete();
+        }
+
         compressedFile = File(result.path);
         compressedSize = await compressedFile.length();
+
+        debugPrint(
+          'Current Iteration: Q:$quality, W:$currentWidth, Size: ${compressedSize / 1024} KB',
+        );
+
+        // If still too large, get "smarter": reduce quality AND dimensions
+        if (compressedSize > maxKiloBytes * 1024) {
+          quality -= 15;
+          if (currentWidth > 600) {
+            currentWidth = (currentWidth * 0.8).toInt();
+            currentHeight = (currentHeight * 0.8).toInt();
+          }
+        }
       }
 
-      debugPrint('Final compressed size: ${compressedSize / 1024} KB');
-      return compressedFile;
+      return compressedFile ?? file;
     } catch (e) {
       debugPrint('Error compressing image: $e');
       return file;

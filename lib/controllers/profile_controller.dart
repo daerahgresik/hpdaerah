@@ -43,7 +43,7 @@ class ProfileController {
       if (newImageFile != null) {
         final compressedFile = await ImageHelper.compressImage(
           file: newImageFile,
-          maxKiloBytes: 200,
+          maxKiloBytes: 100,
         );
         final imageUrl = await _uploadProfilePhoto(
           currentUser.id!,
