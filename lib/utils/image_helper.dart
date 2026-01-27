@@ -6,11 +6,18 @@ import 'package:path/path.dart' as p;
 
 class ImageHelper {
   /// Compress image file to be under maxKiloBytes
-  static Future<File> compressImage({
-    required File file,
-    int maxKiloBytes = 200, // Default to 200KB (for profile), can be overridden
+  static Future<dynamic> compressImage({
+    required dynamic file, // Can be File or XFile or Uint8List
+    int maxKiloBytes = 200,
     int quality = 80,
   }) async {
+    // If Web, just return the file as-is for now (or implement compressWithList)
+    if (kIsWeb) {
+      return file;
+    }
+
+    if (file is! File) return file;
+
     try {
       final originSize = await file.length();
       if (originSize <= maxKiloBytes * 1024) {
@@ -57,7 +64,7 @@ class ImageHelper {
           'Current Iteration: Q:$quality, W:$currentWidth, Size: ${compressedSize / 1024} KB',
         );
 
-        // If still too large, get "smarter": reduce quality AND dimensions
+        // If still too large, reduce quality AND dimensions
         if (compressedSize > maxKiloBytes * 1024) {
           quality -= 15;
           if (currentWidth > 600) {

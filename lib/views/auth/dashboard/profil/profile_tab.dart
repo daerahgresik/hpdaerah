@@ -2,6 +2,7 @@
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/views/auth/login_page.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:hpdaerah/controllers/profile_controller.dart';
 
@@ -38,7 +39,7 @@ class _ProfileTabState extends State<ProfileTab> {
     required String? keterangan,
     required String? noWa,
     String? newPassword,
-    File? newImageFile,
+    dynamic newImageFile,
   }) async {
     setState(() => _isLoading = true);
     try {
@@ -83,7 +84,7 @@ class _ProfileTabState extends State<ProfileTab> {
     }
   }
 
-  Future<File?> _pickImage(ImageSource source) async {
+  Future<dynamic> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
       source: source,
@@ -92,6 +93,7 @@ class _ProfileTabState extends State<ProfileTab> {
     );
 
     if (pickedFile != null) {
+      if (kIsWeb) return pickedFile;
       return File(pickedFile.path);
     }
     return null;
@@ -118,7 +120,8 @@ class _ProfileTabState extends State<ProfileTab> {
     DateTime? selectedBirthDate = _currentUser.tanggalLahir;
     String? selectedKeperluan = _currentUser.keperluan;
     bool obscurePassword = true;
-    File? selectedImageFile;
+    dynamic selectedImageFile; // Can be File or XFile
+    Uint8List? selectedImageBytes;
 
     final statusOptions = ['Warga Asli', 'Perantau'];
     final keperluanOptions = ['MT', 'Kuliah', 'Bekerja'];
@@ -172,11 +175,16 @@ class _ProfileTabState extends State<ProfileTab> {
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.grey[200],
-                          backgroundImage: selectedImageFile != null
-                              ? FileImage(selectedImageFile!) as ImageProvider
-                              : (_currentUser.fotoProfil != null
-                                    ? NetworkImage(_currentUser.fotoProfil!)
-                                    : null),
+                          backgroundImage: selectedImageBytes != null
+                              ? MemoryImage(selectedImageBytes!)
+                              : (selectedImageFile != null && !kIsWeb
+                                        ? FileImage(selectedImageFile as File)
+                                        : (_currentUser.fotoProfil != null
+                                              ? NetworkImage(
+                                                  _currentUser.fotoProfil!,
+                                                )
+                                              : null))
+                                    as ImageProvider?,
                           child:
                               (selectedImageFile == null &&
                                   _currentUser.fotoProfil == null)
@@ -207,9 +215,17 @@ class _ProfileTabState extends State<ProfileTab> {
                                         ImageSource.camera,
                                       );
                                       if (f != null) {
-                                        setModalState(() {
-                                          selectedImageFile = f;
-                                        });
+                                        if (kIsWeb && f is XFile) {
+                                          final bytes = await f.readAsBytes();
+                                          setModalState(() {
+                                            selectedImageFile = f;
+                                            selectedImageBytes = bytes;
+                                          });
+                                        } else {
+                                          setModalState(() {
+                                            selectedImageFile = f;
+                                          });
+                                        }
                                       }
                                     },
                                   ),
@@ -222,9 +238,17 @@ class _ProfileTabState extends State<ProfileTab> {
                                         ImageSource.gallery,
                                       );
                                       if (f != null) {
-                                        setModalState(() {
-                                          selectedImageFile = f;
-                                        });
+                                        if (kIsWeb && f is XFile) {
+                                          final bytes = await f.readAsBytes();
+                                          setModalState(() {
+                                            selectedImageFile = f;
+                                            selectedImageBytes = bytes;
+                                          });
+                                        } else {
+                                          setModalState(() {
+                                            selectedImageFile = f;
+                                          });
+                                        }
                                       }
                                     },
                                   ),

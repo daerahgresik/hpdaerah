@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/presensi_model.dart';
 import '../models/user_model.dart';
@@ -80,12 +81,12 @@ class PresensiService {
     required String pengajianId,
     required String userId,
     required String keterangan,
-    required File imageFile,
+    required dynamic imageFile,
   }) async {
     try {
       // 1. Compress image to max 100KB (Leave Request Policy)
       final compressedFile = await ImageHelper.compressImage(
-        file: imageFile,
+        file: (kIsWeb && imageFile is XFile) ? imageFile : imageFile,
         maxKiloBytes: 100,
       );
 
@@ -113,21 +114,37 @@ class PresensiService {
     }
   }
 
-  Future<String> _uploadIzinPhoto(String userId, File imageFile) async {
+  Future<String> _uploadIzinPhoto(String userId, dynamic image) async {
     try {
-      final fileExt = imageFile.path.split('.').last;
-      final fileName =
-          'izin_${userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final String fileName =
+          'izin_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = fileName;
 
-      // We use 'fotoizin' bucket (dedicated for leave requests)
-      await _client.storage
-          .from('fotoizin')
-          .upload(
-            filePath,
-            imageFile,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-          );
+      if (kIsWeb && image is XFile) {
+        final bytes = await image.readAsBytes();
+        await _client.storage
+            .from('fotoizin')
+            .uploadBinary(
+              filePath,
+              bytes,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
+      } else {
+        final file = image as File;
+        await _client.storage
+            .from('fotoizin')
+            .upload(
+              filePath,
+              file,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
+      }
 
       return _client.storage.from('fotoizin').getPublicUrl(filePath);
     } catch (e) {

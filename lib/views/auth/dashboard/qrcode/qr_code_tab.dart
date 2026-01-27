@@ -4,6 +4,7 @@ import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
@@ -420,7 +421,8 @@ class _QrCodeTabState extends State<QrCodeTab> {
 
   void _showIzinDialog(PengajianQr qr) {
     final noteCtrl = TextEditingController();
-    File? selectedImage;
+    dynamic selectedImage;
+    Uint8List? selectedImageBytes;
     final picker = ImagePicker();
 
     showDialog(
@@ -471,9 +473,17 @@ class _QrCodeTabState extends State<QrCodeTab> {
                         imageQuality: 50,
                       );
                       if (picked != null) {
-                        setDialogState(() {
-                          selectedImage = File(picked.path);
-                        });
+                        if (kIsWeb) {
+                          final bytes = await picked.readAsBytes();
+                          setDialogState(() {
+                            selectedImage = picked;
+                            selectedImageBytes = bytes;
+                          });
+                        } else {
+                          setDialogState(() {
+                            selectedImage = File(picked.path);
+                          });
+                        }
                       }
                     },
                     child: Container(
@@ -484,13 +494,19 @@ class _QrCodeTabState extends State<QrCodeTab> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
-                      child: selectedImage != null
+                      child:
+                          (selectedImageBytes != null || selectedImage != null)
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                selectedImage!,
-                                fit: BoxFit.cover,
-                              ),
+                              child: kIsWeb
+                                  ? Image.memory(
+                                      selectedImageBytes!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Image.file(
+                                      selectedImage as File,
+                                      fit: BoxFit.cover,
+                                    ),
                             )
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,

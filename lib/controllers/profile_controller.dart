@@ -1,4 +1,6 @@
 ﻿import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/utils/image_helper.dart';
@@ -22,7 +24,7 @@ class ProfileController {
     required String? keterangan,
     required String? noWa,
     String? newPassword,
-    File? newImageFile,
+    dynamic newImageFile, // Can be File or XFile
   }) async {
     try {
       final updates = {
@@ -98,21 +100,37 @@ class ProfileController {
   }
 
   /// Private helper to upload photo
-  Future<String> _uploadProfilePhoto(String userId, File imageFile) async {
+  Future<String> _uploadProfilePhoto(String userId, dynamic image) async {
     try {
-      final fileExt = imageFile.path.split('.').last;
-      final fileName =
-          '${userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final String fileName =
+          '${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = fileName;
 
-      // Upload ke Bucket 'fotoprofil'
-      await _client.storage
-          .from('fotoprofil')
-          .upload(
-            filePath,
-            imageFile,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-          );
+      if (kIsWeb && image is XFile) {
+        final bytes = await image.readAsBytes();
+        await _client.storage
+            .from('fotoprofil')
+            .uploadBinary(
+              filePath,
+              bytes,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
+      } else {
+        final file = image as File;
+        await _client.storage
+            .from('fotoprofil')
+            .upload(
+              filePath,
+              file,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
+      }
 
       // Get Public URL
       final imageUrl = _client.storage

@@ -1,4 +1,6 @@
 ﻿import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/organization_model.dart';
@@ -49,7 +51,7 @@ class RegisterController {
     required String? asalDaerah, // Origin City
     required String? keperluan,
     required String? detailKeperluan,
-    File? fotoProfilFile,
+    XFile? fotoProfilFile,
     required String? selectedDaerah,
     required String? selectedDesa,
     required String? selectedKelompok,
@@ -65,7 +67,7 @@ class RegisterController {
       String? fotoUrl;
       if (fotoProfilFile != null) {
         final compressedFile = await ImageHelper.compressImage(
-          file: fotoProfilFile,
+          file: kIsWeb ? fotoProfilFile : File(fotoProfilFile.path),
           maxKiloBytes: 200,
         );
         fotoUrl = await _uploadAvatar(compressedFile);
@@ -122,24 +124,40 @@ class RegisterController {
     }
   }
 
-  Future<String> _uploadAvatar(File imageFile) async {
+  Future<String> _uploadAvatar(dynamic image) async {
     try {
-      final fileExt = imageFile.path.split('.').last;
-      final fileName =
-          'avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final String fileName =
+          'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = fileName;
 
-      await _client.storage
-          .from('fotoprofil')
-          .upload(
-            filePath,
-            imageFile,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-          );
+      if (kIsWeb) {
+        final bytes = await (image as XFile).readAsBytes();
+        await _client.storage
+            .from('fotoprofil')
+            .uploadBinary(
+              filePath,
+              bytes,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
+      } else {
+        final file = image as File;
+        await _client.storage
+            .from('fotoprofil')
+            .upload(
+              filePath,
+              file,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
+      }
 
       return _client.storage.from('fotoprofil').getPublicUrl(filePath);
     } catch (e) {
-      // If error, return null or throw. For now we throw.
       throw 'Gagal upload foto: $e';
     }
   }
