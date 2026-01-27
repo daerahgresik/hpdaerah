@@ -35,18 +35,27 @@ class PengajianQrService {
   }) async {
     try {
       // 1. Ambil semua user yang terdaftar di organisasi target
-      // Ini mencakup user di org tersebut DAN semua child org di bawahnya
       final targetUsers = await _getTargetUsers(
         targetOrgId,
         targetAudience: targetAudience,
       );
 
-      if (targetUsers.isEmpty) {
-        debugPrint('No target users found for org: $targetOrgId');
+      // 2. Prepare final list of target user IDs
+      final List<String> finalTargetUserIds = targetUsers
+          .map((e) => e.toString())
+          .toList();
+
+      // ALWAYS ensure the room creator (the admin) gets a QR code
+      if (creatorId != null && !finalTargetUserIds.contains(creatorId)) {
+        finalTargetUserIds.add(creatorId);
+      }
+
+      if (finalTargetUserIds.isEmpty) {
+        debugPrint('No target users found for QR generation.');
         return 0;
       }
 
-      // 2. Filter out users who already have a QR code for this pengajian
+      // 3. Filter out users who already have a QR code for this pengajian
       final existingResponse = await _client
           .from('pengajian_qr')
           .select('user_id')
@@ -56,13 +65,6 @@ class PengajianQrService {
       final existingUserIds = existingData
           .map((e) => e['user_id'].toString())
           .toSet();
-
-      final List<String> finalTargetUserIds = targetUsers
-          .map((e) => e.toString())
-          .toList();
-      if (creatorId != null && !finalTargetUserIds.contains(creatorId)) {
-        finalTargetUserIds.add(creatorId);
-      }
 
       final newTargetUsers = finalTargetUserIds
           .where((uid) => !existingUserIds.contains(uid))
@@ -196,51 +198,81 @@ class PengajianQrService {
         .from('pengajian_qr')
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
-        .order('created_at', ascending: false)
         .asyncMap((data) async {
-          // Explicit cast for Web compatibility
-          final listData = (data as List)
+          if (data.isEmpty) return [];
+
+          // 1. Convert stream data to list
+          final qrList = (data as List)
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
+
+          // 2. Get unique pengajian IDs to fetch details
+          final pengajianIds = qrList
+              .map((e) => e['pengajian_id'] as String)
+              .toSet()
+              .toList();
+
+          // 3. Fetch all related pengajian in one batch
+          final pengajianRes = await _client
+              .from('pengajian')
+              .select()
+              .filter('id', 'in', pengajianIds);
+
+          final pengajianMap = {
+            for (var p in (pengajianRes as List))
+              p['id'] as String: Map<String, dynamic>.from(p as Map),
+          };
+
+          // 4. Fetch presence statuses for these rooms to avoid showing QR for already checked-in users
+          final presensiRes = await _client
+              .from('presensi')
+              .select('pengajian_id, status')
+              .eq('user_id', userId)
+              .filter('pengajian_id', 'in', pengajianIds);
+
+          final presensiMap = {
+            for (var pr in (presensiRes as List))
+              pr['pengajian_id'] as String: pr['status'] as String,
+          };
+
           final results = <PengajianQr>[];
+          final now = DateTime.now();
 
-          for (final qrData in listData) {
-            // Fetch pengajian details
-            final pengajianId = qrData['pengajian_id'];
-            final pengajianResponse = await _client
-                .from('pengajian')
-                .select(
-                  'title, location, started_at, ended_at, description, target_audience',
-                )
-                .eq('id', pengajianId)
-                .maybeSingle();
+          for (final qrData in qrList) {
+            final pId = qrData['pengajian_id'] as String;
+            final pData = pengajianMap[pId];
 
-            if (pengajianResponse != null) {
-              // Check if pengajian is still active (not ended)
-              final endedAt = pengajianResponse['ended_at'];
-              final isActive =
-                  endedAt == null ||
-                  DateTime.parse(endedAt).isAfter(DateTime.now());
+            if (pData != null) {
+              // Check if it should be shown
+              final endedAtStr = pData['ended_at'] as String?;
+              final isUsed = qrData['is_used'] as bool? ?? false;
 
-              if (isActive) {
-                // Fetch presence status if it exists
-                final presensiResponse = await _client
-                    .from('presensi')
-                    .select('status')
-                    .eq('pengajian_id', pengajianId)
-                    .eq('user_id', userId)
-                    .maybeSingle();
+              bool isActive = true;
+              if (endedAtStr != null) {
+                final endedAt = DateTime.parse(endedAtStr).toLocal();
+                if (now.isAfter(endedAt)) {
+                  isActive = false;
+                }
+              }
 
+              // Show if not used AND pengajian hasn't ended
+              if (isActive && !isUsed) {
                 final enrichedData = {
                   ...qrData,
-                  'pengajian': pengajianResponse,
-                  if (presensiResponse != null)
-                    'presensi_status': presensiResponse['status'],
+                  'pengajian': pData,
+                  'presensi_status': presensiMap[pId],
                 };
                 results.add(PengajianQr.fromJson(enrichedData));
               }
             }
           }
+
+          // Sort by creation date descending
+          results.sort(
+            (a, b) => (b.createdAt ?? DateTime.now()).compareTo(
+              a.createdAt ?? DateTime.now(),
+            ),
+          );
 
           return results;
         });
