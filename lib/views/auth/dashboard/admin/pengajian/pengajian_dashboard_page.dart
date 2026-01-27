@@ -9,8 +9,8 @@ import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_se
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_page.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayatpengajian.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/rekap_pengajian_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/khataman/khataman_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/manual_presence_sheet.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -1312,12 +1312,12 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                               size: 20,
                             ),
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      RekapPengajianPage(pengajian: item),
-                                ),
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) =>
+                                    ManualPresenceSheet(pengajian: item),
                               );
                             },
                             tooltip: "Presensi Manual",
