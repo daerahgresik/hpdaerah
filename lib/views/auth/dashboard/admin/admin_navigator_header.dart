@@ -111,25 +111,19 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
           // Menu Navigation
           Container(
             padding: EdgeInsets.symmetric(
-              vertical: 8, // Slightly tighter
-              horizontal: isTablet ? 24 : 8, // Tighter padding for mobile
+              vertical: 8,
+              horizontal: isTablet ? 24 : 12,
             ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: isTablet ? 800 : double.infinity,
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: adminMenus.map((menu) {
-                      final isSelected = widget.selectedRoute == menu.route;
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: adminMenus.map((menu) {
+                    final isSelected = widget.selectedRoute == menu.route;
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: _AdminMenuChip(
                           title: menu.title,
                           icon: menu.icon,
@@ -137,11 +131,11 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
                           isSelected: isSelected,
                           onTap: () => widget.onRouteSelected(menu.route),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
             ),
           ),
         ],
@@ -465,7 +459,7 @@ class _AdminMenuChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF059669) : Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -486,16 +480,22 @@ class _AdminMenuChip extends StatelessWidget {
               : null,
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 14, color: isSelected ? Colors.white : color),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected ? Colors.white : Colors.grey[800],
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? Colors.white : Colors.grey[800],
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                softWrap: false,
               ),
             ),
           ],
