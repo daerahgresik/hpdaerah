@@ -997,10 +997,11 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 setState(() {
                   _showSearchRoom = !_showSearchRoom;
                   if (_showSearchRoom) {
+                    _showActiveRoom =
+                        true; // MUST show active room to see the search field
                     _showKhataman = false;
                     _showHistoryRoom = false;
                     _showCreateRoom = false;
-                    // Keep _showActiveRoom true so we stay in this context
                   }
                 });
               },
