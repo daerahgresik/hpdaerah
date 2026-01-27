@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
-import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:image_picker/image_picker.dart';
 
-/// Smart QR Code Tab - Organized by status
+/// Smart QR Code Tab - Strictly for Active QR Codes
 class QrCodeTab extends StatefulWidget {
   final UserModel user;
   const QrCodeTab({super.key, required this.user});
@@ -17,19 +14,14 @@ class QrCodeTab extends StatefulWidget {
   State<QrCodeTab> createState() => _QrCodeTabState();
 }
 
-class _QrCodeTabState extends State<QrCodeTab>
-    with SingleTickerProviderStateMixin {
+class _QrCodeTabState extends State<QrCodeTab> {
   final _qrService = PengajianQrService();
-  final _presensiService = PresensiService();
-  late TabController _tabController;
   late Stream<List<PengajianQr>> _qrStream;
-  bool _isSubmittingIzin = false;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _initStream();
     // Refresh UI every minute for countdowns
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
@@ -39,7 +31,6 @@ class _QrCodeTabState extends State<QrCodeTab>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _timer?.cancel();
     super.dispose();
   }
@@ -71,19 +62,6 @@ class _QrCodeTabState extends State<QrCodeTab>
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          dividerColor: Colors.transparent,
-          tabs: const [
-            Tab(text: 'Aktif', icon: Icon(Icons.qr_code_2, size: 20)),
-            Tab(text: 'Hadir', icon: Icon(Icons.check_circle, size: 20)),
-            Tab(text: 'Izin', icon: Icon(Icons.event_busy, size: 20)),
-          ],
-        ),
       ),
       body: StreamBuilder<List<PengajianQr>>(
         stream: _qrStream,
@@ -99,32 +77,15 @@ class _QrCodeTabState extends State<QrCodeTab>
           }
 
           final allQr = snapshot.data ?? [];
-
-          // Categorize QR codes
+          // Categorize QR codes - ONLY SHOW ACTIVE
           final aktif = allQr.where((q) => !q.isUsed).toList();
-          final hadir = allQr
-              .where((q) => q.isUsed && q.presensiStatus == 'hadir')
-              .toList();
-          final izin = allQr
-              .where((q) => q.isUsed && q.presensiStatus == 'izin')
-              .toList();
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _buildAktifTab(aktif),
-              _buildHadirTab(hadir),
-              _buildIzinTab(izin),
-            ],
-          );
+          return _buildAktifTab(aktif);
         },
       ),
     );
   }
 
-  // ============================================================================
-  // TAB 1: AKTIF - QR yang belum di-scan
-  // ============================================================================
   Widget _buildAktifTab(List<PengajianQr> aktifList) {
     if (aktifList.isEmpty) {
       return _buildEmptyState(
@@ -142,66 +103,13 @@ class _QrCodeTabState extends State<QrCodeTab>
         itemCount: aktifList.length,
         itemBuilder: (context, index) {
           final qr = aktifList[index];
-          return _buildQrCard(qr, isActive: true);
+          return _buildQrCard(qr);
         },
       ),
     );
   }
 
-  // ============================================================================
-  // TAB 2: HADIR - QR yang sudah di-scan dengan status hadir
-  // ============================================================================
-  Widget _buildHadirTab(List<PengajianQr> hadirList) {
-    if (hadirList.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.event_available,
-        title: 'Belum Ada Kehadiran',
-        subtitle: 'Scan QR Code untuk menandai kehadiran Anda',
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async => setState(() {}),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: hadirList.length,
-        itemBuilder: (context, index) {
-          final qr = hadirList[index];
-          return _buildCompletedCard(qr, status: 'hadir');
-        },
-      ),
-    );
-  }
-
-  // ============================================================================
-  // TAB 3: IZIN - QR dengan status izin
-  // ============================================================================
-  Widget _buildIzinTab(List<PengajianQr> izinList) {
-    if (izinList.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.assignment_turned_in,
-        title: 'Tidak Ada Izin',
-        subtitle: 'Anda belum pernah mengajukan izin',
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async => setState(() {}),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: izinList.length,
-        itemBuilder: (context, index) {
-          final qr = izinList[index];
-          return _buildCompletedCard(qr, status: 'izin');
-        },
-      ),
-    );
-  }
-
-  // ============================================================================
-  // CARD BUILDERS
-  // ============================================================================
-  Widget _buildQrCard(PengajianQr qr, {required bool isActive}) {
+  Widget _buildQrCard(PengajianQr qr) {
     final now = DateTime.now();
     final startTime = qr.pengajianStartedAt;
     final endTime = qr.pengajianEndedAt;
@@ -408,38 +316,7 @@ class _QrCodeTabState extends State<QrCodeTab>
               ),
             ),
           ),
-
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isSubmittingIzin ? null : () => _ajukanIzin(qr),
-                    icon: _isSubmittingIzin
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.event_busy, size: 18),
-                    label: Text(
-                      _isSubmittingIzin ? 'Mengirim...' : 'Ajukan Izin',
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange[800],
-                      side: BorderSide(color: Colors.orange.shade300),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 16), // Padding bottom for the card
         ],
       ),
     );
@@ -476,70 +353,6 @@ class _QrCodeTabState extends State<QrCodeTab>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildCompletedCard(PengajianQr qr, {required String status}) {
-    final isHadir = status == 'hadir';
-    final color = isHadir ? Colors.green : Colors.orange;
-    final icon = isHadir ? Icons.check_circle : Icons.event_busy;
-    final label = isHadir ? 'Hadir' : 'Izin';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  qr.pengajianTitle ?? 'Pengajian',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                if (qr.pengajianStartedAt != null)
-                  Text(
-                    _formatDateTime(qr.pengajianStartedAt!),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -581,109 +394,6 @@ class _QrCodeTabState extends State<QrCodeTab>
         ),
       ),
     );
-  }
-
-  // ============================================================================
-  // IZIN SUBMISSION
-  // ============================================================================
-  void _ajukanIzin(PengajianQr qr) async {
-    final picker = ImagePicker();
-    final XFile? photo = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 50,
-      maxWidth: 600,
-    );
-
-    if (photo == null) return;
-    if (!mounted) return;
-
-    final keteranganCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Keterangan Izin'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Harap berikan alasan izin Anda (Wajib diisi)',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: keteranganCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Contoh: Sedang sakit, tugas kantor, dll.',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Keterangan tidak boleh kosong';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A5F2D),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Kirim Izin'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      setState(() => _isSubmittingIzin = true);
-      try {
-        await _presensiService.submitLeaveRequest(
-          pengajianId: qr.pengajianId,
-          userId: widget.user.id!,
-          keterangan: keteranganCtrl.text.trim(),
-          imageFile: File(photo.path),
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Izin berhasil diajukan'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isSubmittingIzin = false);
-      }
-    }
   }
 
   String _formatDateTime(DateTime dt) {
