@@ -209,27 +209,35 @@ class _QrCodeTabState extends State<QrCodeTab> {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: statusColor.withValues(alpha: 0.5),
+                      color: statusColor.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(statusIcon, color: Colors.white, size: 8),
-                      const SizedBox(width: 2),
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(statusIcon, color: Colors.white, size: 8),
+                      ),
+                      const SizedBox(width: 6),
                       Text(
-                        statusText,
+                        statusText.toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 8,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
@@ -239,39 +247,62 @@ class _QrCodeTabState extends State<QrCodeTab> {
             ),
           ),
 
-          // Main Info - Micro
+          // Main Info - Premium Micro Layout
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               children: [
                 Row(
                   children: [
                     Expanded(
                       child: _buildInfoRow(
-                        Icons.location_on,
+                        Icons.location_on_rounded,
                         "Lokasi",
                         qr.pengajianLocation ?? "-",
-                        Colors.redAccent,
+                        Colors.redAccent.shade400,
                       ),
                     ),
                     Expanded(
                       child: _buildInfoRow(
-                        Icons.calendar_month,
-                        "Waktu",
-                        startTime != null ? _formatDateTime(startTime) : "-",
+                        Icons.calendar_today_rounded,
+                        "Tanggal",
+                        startTime != null
+                            ? "${startTime.day} ${_months[startTime.month - 1]} ${startTime.year}"
+                            : "-",
                         Colors.blueAccent,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoRow(
+                        Icons.access_time_rounded,
+                        "Jam (Mulai - Selesai)",
+                        _getTimeRange(startTime, endTime),
+                        Colors.green.shade600,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildInfoRow(
+                        Icons.hourglass_bottom_rounded,
+                        "Durasi Sesi",
+                        _getFullDuration(startTime, endTime),
+                        Colors.indigoAccent,
                       ),
                     ),
                   ],
                 ),
                 if (qr.pengajianDescription != null &&
                     qr.pengajianDescription!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 8),
                   _buildInfoRow(
-                    Icons.info,
+                    Icons.description_rounded,
                     "Keterangan",
                     qr.pengajianDescription!,
-                    Colors.orangeAccent,
+                    Colors.orangeAccent.shade700,
                   ),
                 ],
               ],
@@ -337,37 +368,53 @@ class _QrCodeTabState extends State<QrCodeTab> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value, Color color) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 9,
-                  color: Colors.grey[500],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 12, color: color),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 7,
+                    letterSpacing: 0.5,
+                    color: color.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -582,23 +629,43 @@ class _QrCodeTabState extends State<QrCodeTab> {
     );
   }
 
-  String _formatDateTime(DateTime dt) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Ags',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
-    ];
-    final time =
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year} • $time';
+  final List<String> _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Ags',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+
+  String _getTimeRange(DateTime? start, DateTime? end) {
+    if (start == null) return "-";
+    final s =
+        "${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}";
+    if (end == null) return s;
+    final e =
+        "${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}";
+    return "$s - $e";
+  }
+
+  String _getFullDuration(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return "-";
+    final diff = end.difference(start);
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    final seconds = diff.inSeconds % 60;
+
+    List<String> parts = [];
+    if (hours > 0) parts.add("${hours}j");
+    if (minutes > 0) parts.add("${minutes}m");
+    if (seconds > 0) parts.add("${seconds}d");
+
+    return parts.isEmpty ? "0d" : parts.join(" ");
   }
 }
