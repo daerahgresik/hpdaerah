@@ -165,6 +165,61 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _register() async {
+    // 1. Ambil list field yang kosong untuk divalidasi secara cerdas
+    List<String> missingFields = [];
+
+    if (_imageFile == null) missingFields.add('Foto Profil');
+    if (_namaController.text.trim().isEmpty) missingFields.add('Nama Lengkap');
+    if (_noWaController.text.trim().isEmpty) missingFields.add('No. WhatsApp');
+    if (_usernameController.text.trim().isEmpty) missingFields.add('Username');
+    if (_passwordController.text.isEmpty) missingFields.add('Password');
+    if (_confirmPasswordController.text.isEmpty) {
+      missingFields.add('Konfirmasi Password');
+    }
+    if (_selectedStatus == null) missingFields.add('Status (Asli/Perantau)');
+
+    if (_selectedStatus == 'Perantau') {
+      if (_asalController.text.trim().isEmpty) missingFields.add('Asal Daerah');
+      if (_selectedKeperluan == null) missingFields.add('Keperluan');
+      if ((_selectedKeperluan == 'Kuliah' || _selectedKeperluan == 'Bekerja') &&
+          _detailKeperluanController.text.trim().isEmpty) {
+        missingFields.add('Detail Tempat (Kuliah/Kerja)');
+      }
+    }
+
+    if (_selectedDaerah == null) missingFields.add('Pilihan Daerah');
+    if (_selectedDesa == null) missingFields.add('Pilihan Desa');
+    if (_selectedKelompok == null) missingFields.add('Pilihan Kelompok');
+    if (_selectedKelas == null) missingFields.add('Kelas Pengajian');
+
+    // 2. Jika ada yang kosong, hentikan dan beri tahu user
+    if (missingFields.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Mohon lengkapi data berikut:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(missingFields.map((f) => '• $f').join('\n')),
+            ],
+          ),
+          backgroundColor: Colors.orange[800],
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 3. Validasi form dasar (seperti panjang password, dll)
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
@@ -186,7 +241,7 @@ class _RegisterPageState extends State<RegisterPage> {
           selectedKelompok: _selectedKelompok,
           selectedKelas: _selectedKelas,
           fotoProfilFile: _imageFile,
-          noWa: _noWaController.text.trim(), // Add noWa
+          noWa: _noWaController.text.trim(),
         );
 
         if (mounted) {
@@ -218,18 +273,6 @@ class _RegisterPageState extends State<RegisterPage> {
           );
         }
       }
-    } else {
-      // Validation failed
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Mohon lengkapi semua data wajib (tanda *)'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
     }
   }
 
