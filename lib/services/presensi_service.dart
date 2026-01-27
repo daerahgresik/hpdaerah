@@ -233,6 +233,33 @@ class PresensiService {
     }
   }
 
+  Future<UserModel?> findUserById(String id) async {
+    try {
+      final response = await _client
+          .from('users')
+          .select('''*, 
+               org_daerah:organizations!org_daerah_id(name), 
+               org_desa:organizations!org_desa_id(name), 
+               org_kelompok:organizations!org_kelompok_id(name)''')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return UserModel.fromJson({
+        ...response,
+        'daerah_name':
+            (response['org_daerah'] as Map<String, dynamic>?)?['name'],
+        'desa_name': (response['org_desa'] as Map<String, dynamic>?)?['name'],
+        'kelompok_name':
+            (response['org_kelompok'] as Map<String, dynamic>?)?['name'],
+      });
+    } catch (e) {
+      debugPrint("Error findUserById: $e");
+      return null;
+    }
+  }
+
   Future<UserModel?> findUserByUsername(String username) async {
     try {
       final response = await _client

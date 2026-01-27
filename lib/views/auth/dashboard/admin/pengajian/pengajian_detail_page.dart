@@ -5,6 +5,7 @@ import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:hpdaerah/services/pengajian_qr_service.dart';
 
 class PengajianDetailPage extends StatefulWidget {
   final Pengajian pengajian;
@@ -28,8 +29,8 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
         MaterialPageRoute(
           builder: (context) => BarcodeScannerPage(
             pengajian: widget.pengajian,
-            onResult: (username) async {
-              await _handleScanResult(username);
+            onResult: (code) async {
+              await _handleScanResult(code);
             },
           ),
         ),
@@ -53,24 +54,53 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
     }
   }
 
-  Future<void> _handleScanResult(String username) async {
+  Future<void> _handleScanResult(String code) async {
     try {
-      // 1. Find User
-      final user = await _presensiService.findUserByUsername(username);
-      if (user == null) {
-        _showErrorSnackBar("User tidak ditemukan: $username");
-        return;
-      }
+      if (code.startsWith('PGJ-')) {
+        // Handle New Unique QR Format
+        final qrService = PengajianQrService();
+        final qr = await qrService.validateQrCode(code);
 
-      // 2. Show Verification Dialog (Anti-Fraud Rule Section 7A)
-      if (!mounted) return;
-      _showVerificationDialog(user);
+        if (qr == null) {
+          _showErrorSnackBar("QR Code tidak valid atau tidak ditemukan!");
+          return;
+        }
+
+        if (qr.pengajianId != widget.pengajian.id) {
+          _showErrorSnackBar("QR ini bukan untuk pengajian ini!");
+          return;
+        }
+
+        if (qr.isUsed) {
+          _showErrorSnackBar("QR ini sudah digunakan!");
+          return;
+        }
+
+        // Get User
+        final user = await _presensiService.findUserById(qr.userId);
+        if (user == null) {
+          _showErrorSnackBar("Pemilik QR tidak ditemukan!");
+          return;
+        }
+
+        if (!mounted) return;
+        _showVerificationDialog(user, qrCode: code);
+      } else {
+        // Handle Legacy Username Scan
+        final user = await _presensiService.findUserByUsername(code);
+        if (user == null) {
+          _showErrorSnackBar("Username tidak ditemukan: $code");
+          return;
+        }
+        if (!mounted) return;
+        _showVerificationDialog(user);
+      }
     } catch (e) {
       _showErrorSnackBar("Gagal memproses data: $e");
     }
   }
 
-  void _showVerificationDialog(UserModel user) {
+  void _showVerificationDialog(UserModel user, {String? qrCode}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -129,7 +159,11 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _recordManualPresence(user, 'tidak_hadir');
+                      _recordManualPresence(
+                        user,
+                        'tidak_hadir',
+                        qrCode: qrCode,
+                      );
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
@@ -147,7 +181,7 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _recordManualPresence(user, 'hadir');
+                      _recordManualPresence(user, 'hadir', qrCode: qrCode);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1A5F2D),
@@ -187,14 +221,36 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
     );
   }
 
-  Future<void> _recordManualPresence(UserModel user, String status) async {
+  Future<void> _recordManualPresence(
+    UserModel user,
+    String status, {
+    String? qrCode,
+  }) async {
     try {
-      await _presensiService.recordPresence(
-        pengajianId: widget.pengajian.id,
-        userId: user.id!,
-        method: 'qr',
-        status: status,
-      );
+      if (status == 'hadir' && qrCode != null) {
+        // High-security process for unique QR
+        final qrService = PengajianQrService();
+        final result = await qrService.processQrScan(qrCode);
+        if (result['success'] == false) {
+          throw result['message'] ?? "Gagal memproses QR";
+        }
+      } else {
+        // Standard or manual process
+        await _presensiService.recordPresence(
+          pengajianId: widget.pengajian.id,
+          userId: user.id!,
+          method: qrCode != null ? 'qr' : 'manual',
+          status: status,
+        );
+
+        // If it was a QR scan but rejected/manually handled,
+        // we might still want to invalidate the QR if it exists
+        if (qrCode != null) {
+          final qrService = PengajianQrService();
+          final qr = await qrService.validateQrCode(qrCode);
+          if (qr != null) await qrService.markQrAsUsed(qr.id);
+        }
+      }
 
       if (status == 'hadir') {
         _showSuccessSnackBar("Berhasil: ${user.nama} telah hadir");

@@ -5,7 +5,7 @@ import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
-import 'package:hpdaerah/views/auth/dashboard/qrcode/qr_code_tab.dart';
+import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/rekap_pengajian_page.dart';
 
 class HomeTab extends StatelessWidget {
@@ -16,10 +16,7 @@ class HomeTab extends StatelessWidget {
   void _handleNavigation(BuildContext context, String route) {
     switch (route) {
       case '/qr-view':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => QrCodeTab(user: user)),
-        );
+        DashboardPage.of(context)?.setSelectedIndex(1);
         break;
       case '/riwayat':
         _showSnackBar(context, "Menu Riwayat (Segera Hadir)");
@@ -188,10 +185,7 @@ class HomeTab extends StatelessWidget {
           icon: Icons.qr_code_2,
           color: const Color(0xFF1A5F2D),
           actionLabel: "Tampilkan QR",
-          onAction: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => QrCodeTab(user: user)),
-          ),
+          onAction: () => DashboardPage.of(context)?.setSelectedIndex(1),
         );
       },
     );

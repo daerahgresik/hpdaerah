@@ -14,10 +14,13 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, required this.user});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  DashboardPageState createState() => DashboardPageState();
+
+  static DashboardPageState? of(BuildContext context) =>
+      context.findAncestorStateOfType<DashboardPageState>();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
 
   @override
@@ -44,7 +47,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return pages;
   }
 
-  void _onItemTapped(int index) {
+  void setSelectedIndex(int index) {
     setState(() {
       _selectedIndex = index;
     });
@@ -134,7 +137,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }) {
     final isSelected = _selectedIndex == index;
     return GestureDetector(
-      onTap: () => _onItemTapped(index),
+      onTap: () => setSelectedIndex(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
