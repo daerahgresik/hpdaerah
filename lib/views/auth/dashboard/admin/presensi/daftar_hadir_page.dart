@@ -229,7 +229,7 @@ class _DaftarHadirPageState extends State<DaftarHadirPage> {
       padding: const EdgeInsets.all(16),
       color: Colors.white,
       child: DropdownButtonFormField<String>(
-        value: _selectedPengajianId,
+        initialValue: _selectedPengajianId,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: 'Pilih Pengajian',

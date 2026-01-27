@@ -12,12 +12,15 @@ class ProfileController {
     required UserModel currentUser,
     required String nama,
     required String username,
-    required String asal,
-    required String statusWarga,
-    required String keperluan,
-    required String detailKeperluan,
-    required String keterangan,
-    required String noWa, // Add noWa
+    required String? asal, // Citizen Status
+    required String? status, // Marriage Status
+    required String? jenisKelamin,
+    required DateTime? tanggalLahir,
+    required String? asalDaerah, // City
+    required String? keperluan,
+    required String? detailKeperluan,
+    required String? keterangan,
+    required String? noWa,
     String? newPassword,
     File? newImageFile,
   }) async {
@@ -26,11 +29,14 @@ class ProfileController {
         'nama': nama,
         'username': username,
         'asal': asal,
-        'status_warga': statusWarga,
+        'status': status,
+        'jenis_kelamin': jenisKelamin,
+        'tanggal_lahir': tanggalLahir?.toIso8601String().split('T')[0],
+        'asal_daerah': asalDaerah,
         'keperluan': keperluan,
         'detail_keperluan': detailKeperluan,
         'keterangan': keterangan,
-        'no_wa': noWa, // Add to updates
+        'no_wa': noWa,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -55,18 +61,12 @@ class ProfileController {
       // --- SELECT TABLE & FIELDS BASED ON ROLE ---
       if (currentUser.isSuperAdmin) {
         // Super Admin -> 'super_admins' table
-        // Only update fields that exist in super_admins
         final superAdminUpdates = {
           'nama': nama,
           'username': username,
           if (newPassword != null && newPassword.isNotEmpty)
             'password': newPassword,
         };
-
-        // Note: super_admins table doesn't have profile photo column in this schema yet,
-        // but if we want to support it, we'd need to add it or ignore it.
-        // For now we'll ignore photo update for super admin or handle it if column exists.
-        // Assuming we haven't added 'foto_profil' to super_admins yet in SQL.
 
         await _client
             .from('super_admins')
@@ -82,11 +82,14 @@ class ProfileController {
         nama: nama,
         username: username,
         asal: asal,
-        statusWarga: statusWarga,
+        status: status,
+        jenisKelamin: jenisKelamin,
+        tanggalLahir: tanggalLahir,
+        asalDaerah: asalDaerah,
         keperluan: keperluan,
         detailKeperluan: detailKeperluan,
         keterangan: keterangan,
-        noWa: noWa, // Update local model
+        noWa: noWa,
         fotoProfil: updates['foto_profil'] ?? currentUser.fotoProfil,
       );
     } catch (e) {

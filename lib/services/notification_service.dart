@@ -11,9 +11,9 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
-  
+
   final SupabaseClient _supabase = Supabase.instance.client;
-  
+
   bool _isInitialized = false;
 
   // Initialize
@@ -21,8 +21,9 @@ class NotificationService {
     if (_isInitialized) return;
 
     // Android Settings
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
 
     // iOS Settings
     const iosSettings = DarwinInitializationSettings(
@@ -31,8 +32,10 @@ class NotificationService {
       requestSoundPermission: true,
     );
 
-    const settings =
-        InitializationSettings(android: androidSettings, iOS: iosSettings);
+    const settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
 
     await _notifications.initialize(settings);
     _isInitialized = true;
@@ -55,15 +58,20 @@ class NotificationService {
 
     const iosDetails = DarwinNotificationDetails();
 
-    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     await _notifications.show(id, title, body, details);
   }
 
   // Monitor Active Pengajian
   void startMonitoring(UserModel user) {
-    debugPrint("Start monitoring notifications for: ${user.nama} (${user.statusWarga})");
-    
+    debugPrint(
+      "Start monitoring notifications for: ${user.nama} (${user.asal})",
+    );
+
     // Listen to changes in 'pengajian' table
     _supabase
         .from('pengajian')
@@ -80,12 +88,16 @@ class NotificationService {
     for (var item in data) {
       try {
         final p = Pengajian.fromJson(item);
-        
+
         // 1. Check if ACTIVE (started recently, not ended)
         // Let's say active if started within last 6 hours and not ended
         // Or started in future (upcoming) within 1 hour
-        final isRecent = p.startedAt.isAfter(now.subtract(const Duration(hours: 6)));
-        final isUpcoming = p.startedAt.isAfter(now) && p.startedAt.isBefore(now.add(const Duration(hours: 1)));
+        final isRecent = p.startedAt.isAfter(
+          now.subtract(const Duration(hours: 6)),
+        );
+        final isUpcoming =
+            p.startedAt.isAfter(now) &&
+            p.startedAt.isBefore(now.add(const Duration(hours: 1)));
         final isOngoing = p.startedAt.isBefore(now) && p.endedAt == null;
 
         if ((isRecent || isUpcoming) && (isOngoing || isUpcoming)) {
@@ -106,13 +118,13 @@ class NotificationService {
     if (target == null || target.isEmpty || target.toLowerCase() == 'semua') {
       return true;
     }
-    
+
     // Normalize logic
     // target examples: 'Muda-mudi', 'Praremaja', 'Caberawit'
     // user status examples: 'Muda-mudi', 'Praremaja', etc.
     // Need flexible matching
     final t = target.toLowerCase().replaceAll('-', '');
-    final u = (user.statusWarga ?? '').toLowerCase().replaceAll('-', '');
+    final u = (user.asal ?? '').toLowerCase().replaceAll('-', '');
     final k = (user.keterangan ?? '').toLowerCase();
 
     if (u.contains(t)) return true;
@@ -126,14 +138,16 @@ class NotificationService {
     // We only want to notify once per event ideally.
     // Ideally we store 'notified_events' in shared_prefs.
     // For simplicity now, just show. The OS will debounce if ID is same.
-    
+
     final id = p.id.hashCode;
-    final timeStr = "${p.startedAt.hour}:${p.startedAt.minute.toString().padLeft(2, '0')}";
-    
+    final timeStr =
+        "${p.startedAt.hour}:${p.startedAt.minute.toString().padLeft(2, '0')}";
+
     await showNotification(
       id: id,
       title: "Pengajian Aktif: ${p.title}",
-      body: "Dimulai pukul $timeStr di ${p.location ?? 'Lokasi tidak ada'}. Klik untuk hadir.",
+      body:
+          "Dimulai pukul $timeStr di ${p.location ?? 'Lokasi tidak ada'}. Klik untuk hadir.",
     );
   }
 }

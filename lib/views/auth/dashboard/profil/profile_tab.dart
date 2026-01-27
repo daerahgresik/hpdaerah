@@ -28,12 +28,15 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _updateProfile({
     required String nama,
     required String username,
-    required String asal,
-    required String statusWarga,
-    required String keperluan,
-    required String detailKeperluan,
-    required String keterangan,
-    required String noWa,
+    required String? asal,
+    required String? status,
+    required String? jenisKelamin,
+    required DateTime? tanggalLahir,
+    required String? asalDaerah,
+    required String? keperluan,
+    required String? detailKeperluan,
+    required String? keterangan,
+    required String? noWa,
     String? newPassword,
     File? newImageFile,
   }) async {
@@ -44,7 +47,10 @@ class _ProfileTabState extends State<ProfileTab> {
         nama: nama,
         username: username,
         asal: asal,
-        statusWarga: statusWarga,
+        status: status,
+        jenisKelamin: jenisKelamin,
+        tanggalLahir: tanggalLahir,
+        asalDaerah: asalDaerah,
         keperluan: keperluan,
         detailKeperluan: detailKeperluan,
         keterangan: keterangan,
@@ -96,7 +102,9 @@ class _ProfileTabState extends State<ProfileTab> {
     final usernameCtrl = TextEditingController(text: _currentUser.username);
     final noWaCtrl = TextEditingController(text: _currentUser.noWa ?? '');
     final passwordCtrl = TextEditingController();
-    final asalCtrl = TextEditingController(text: _currentUser.asal ?? '');
+    final asalDaerahCtrl = TextEditingController(
+      text: _currentUser.asalDaerah ?? '',
+    );
     final detailKeperluanCtrl = TextEditingController(
       text: _currentUser.detailKeperluan ?? '',
     );
@@ -104,7 +112,10 @@ class _ProfileTabState extends State<ProfileTab> {
       text: _currentUser.keterangan ?? '',
     );
 
-    String? selectedStatus = _currentUser.statusWarga;
+    String? selectedCitizenStatus = _currentUser.asal;
+    String? selectedMarriageStatus = _currentUser.status;
+    String? selectedGender = _currentUser.jenisKelamin;
+    DateTime? selectedBirthDate = _currentUser.tanggalLahir;
     String? selectedKeperluan = _currentUser.keperluan;
     bool obscurePassword = true;
     File? selectedImageFile;
@@ -253,6 +264,117 @@ class _ProfileTabState extends State<ProfileTab> {
                       const SizedBox(height: 16),
                       _buildTextField(noWaCtrl, 'No. WhatsApp', Icons.chat),
                       const SizedBox(height: 16),
+                      _buildSectionTitle('Data Pribadi'),
+                      // GENDER
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[500]!),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: ['Pria', 'Wanita'].contains(selectedGender)
+                                ? selectedGender
+                                : null,
+                            hint: const Text('Pilih Jenis Kelamin'),
+                            isExpanded: true,
+                            items: ['Pria', 'Wanita']
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(e),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) =>
+                                setModalState(() => selectedGender = val),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // MARRIAGE
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[500]!),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value:
+                                [
+                                  'Kawin',
+                                  'Belum Kawin',
+                                ].contains(selectedMarriageStatus)
+                                ? selectedMarriageStatus
+                                : null,
+                            hint: const Text('Status Pernikahan'),
+                            isExpanded: true,
+                            items: ['Kawin', 'Belum Kawin']
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(e),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) => setModalState(
+                              () => selectedMarriageStatus = val,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // BIRTH DATE
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedBirthDate ?? DateTime(2000),
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setModalState(() => selectedBirthDate = picked);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[500]!),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                selectedBirthDate == null
+                                    ? 'Pilih Tanggal Lahir'
+                                    : "${selectedBirthDate!.day}/${selectedBirthDate!.month}/${selectedBirthDate!.year}",
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       _buildSectionTitle('Status Kewarganegaraan'),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -266,10 +388,10 @@ class _ProfileTabState extends State<ProfileTab> {
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: statusOptions.contains(selectedStatus)
-                                ? selectedStatus
+                            value: statusOptions.contains(selectedCitizenStatus)
+                                ? selectedCitizenStatus
                                 : null,
-                            hint: const Text('Pilih Status'),
+                            hint: const Text('Pilih Asal'),
                             isExpanded: true,
                             items: statusOptions
                                 .map(
@@ -281,10 +403,10 @@ class _ProfileTabState extends State<ProfileTab> {
                                 .toList(),
                             onChanged: (val) {
                               setModalState(() {
-                                selectedStatus = val;
+                                selectedCitizenStatus = val;
                                 if (val == 'Warga Asli') {
                                   selectedKeperluan = null;
-                                  asalCtrl.clear();
+                                  asalDaerahCtrl.clear();
                                   detailKeperluanCtrl.clear();
                                 }
                               });
@@ -292,10 +414,10 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ),
                       ),
-                      if (selectedStatus == 'Perantau') ...[
+                      if (selectedCitizenStatus == 'Perantau') ...[
                         const SizedBox(height: 16),
                         _buildTextField(
-                          asalCtrl,
+                          asalDaerahCtrl,
                           'Asal Daerah (Kota/Kab)',
                           Icons.flight_land,
                         ),
@@ -387,22 +509,14 @@ class _ProfileTabState extends State<ProfileTab> {
                       onPressed: _isLoading
                           ? null
                           : () {
-                              if (selectedStatus == 'Perantau' &&
-                                  asalCtrl.text.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Asal wajib diisi untuk perantau',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
                               _updateProfile(
                                 nama: namaCtrl.text,
                                 username: usernameCtrl.text,
-                                asal: asalCtrl.text,
-                                statusWarga: selectedStatus ?? 'Warga Asli',
+                                asal: selectedCitizenStatus,
+                                status: selectedMarriageStatus,
+                                jenisKelamin: selectedGender,
+                                tanggalLahir: selectedBirthDate,
+                                asalDaerah: asalDaerahCtrl.text,
                                 keperluan: selectedKeperluan ?? '',
                                 detailKeperluan: detailKeperluanCtrl.text,
                                 keterangan: keteranganCtrl.text,
@@ -641,15 +755,29 @@ class _ProfileTabState extends State<ProfileTab> {
                           ],
                         ),
                         const Divider(height: 24),
-                        _buildDetailRow('Asal Daerah', _currentUser.asal),
+                        _buildDetailRow('Asal', _currentUser.asal),
+                        _buildDetailRow('Status', _currentUser.status),
                         _buildDetailRow(
-                          'Status Warga',
-                          _currentUser.statusWarga,
+                          'Jenis Kelamin',
+                          _currentUser.jenisKelamin,
                         ),
+                        _buildDetailRow(
+                          'Tanggal Lahir',
+                          _currentUser.tanggalLahir != null
+                              ? "${_currentUser.tanggalLahir!.day}/${_currentUser.tanggalLahir!.month}/${_currentUser.tanggalLahir!.year}"
+                              : null,
+                        ),
+                        if (_currentUser.asal == 'Perantau')
+                          _buildDetailRow(
+                            'Asal Daerah',
+                            _currentUser.asalDaerah,
+                          ),
                         _buildDetailRow('No. WA', _currentUser.noWa),
-                        if (_currentUser.keperluan != null)
+                        if (_currentUser.keperluan != null &&
+                            _currentUser.keperluan!.isNotEmpty)
                           _buildDetailRow('Keperluan', _currentUser.keperluan),
-                        if (_currentUser.detailKeperluan != null)
+                        if (_currentUser.detailKeperluan != null &&
+                            _currentUser.detailKeperluan!.isNotEmpty)
                           _buildDetailRow(
                             'Detail',
                             _currentUser.detailKeperluan,

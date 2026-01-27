@@ -195,7 +195,7 @@ class _ManualAttendanceTabState extends State<_ManualAttendanceTab> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _selectedRoomId,
+                    initialValue: _selectedRoomId,
                     hint: const Text("Pilih room untuk presensi manual"),
                     isExpanded: true,
                     decoration: InputDecoration(

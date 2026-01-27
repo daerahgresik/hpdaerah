@@ -4,8 +4,11 @@ class UserModel {
   final String username;
   final String nama;
   final String? password; // Only used during registration
-  final String? asal;
-  final String status;
+  final String? asal; // Warga Asli / Perantau
+  final String status; // Kawin / Belum Kawin
+  final String? jenisKelamin; // Pria / Wanita
+  final DateTime? tanggalLahir;
+  final String? asalDaerah; // Kota asal jika perantau
   final String? jabatan;
   final String? keterangan;
   final String? fotoProfil;
@@ -17,8 +20,7 @@ class UserModel {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  // Additional Profile Fields
-  final String? statusWarga;
+  // Additional Profile Fields (asal is primary now)
   final String? keperluan;
   final String? detailKeperluan;
   final String? noWa;
@@ -45,7 +47,10 @@ class UserModel {
     required this.nama,
     this.password,
     this.asal,
-    this.status = 'active',
+    this.status = 'Belum Kawin',
+    this.jenisKelamin,
+    this.tanggalLahir,
+    this.asalDaerah,
     this.jabatan,
     this.keterangan,
     this.fotoProfil,
@@ -54,9 +59,7 @@ class UserModel {
     this.adminLevel,
     this.adminOrgId,
     this.currentOrgId,
-    this.createdAt,
     this.updatedAt,
-    this.statusWarga,
     this.keperluan,
     this.detailKeperluan,
     this.noWa,
@@ -117,8 +120,13 @@ class UserModel {
       id: json['id'],
       username: json['username'] ?? '',
       nama: json['nama'] ?? '',
-      asal: json['asal'],
-      status: json['status'] ?? 'active',
+      asal: json['asal'], // Warga Asli / Perantau
+      status: json['status'] ?? 'Belum Kawin',
+      jenisKelamin: json['jenis_kelamin'],
+      tanggalLahir: json['tanggal_lahir'] != null
+          ? DateTime.parse(json['tanggal_lahir'])
+          : null,
+      asalDaerah: json['asal_daerah'],
       jabatan: json['jabatan'],
       keterangan: json['keterangan'],
       fotoProfil: json['foto_profil'],
@@ -133,7 +141,6 @@ class UserModel {
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'])
           : null,
-      statusWarga: json['status_warga'],
       keperluan: json['keperluan'],
       detailKeperluan: json['detail_keperluan'],
       noWa: json['no_wa'],
@@ -156,6 +163,9 @@ class UserModel {
       if (password != null) 'password': password,
       'asal': asal,
       'status': status,
+      'jenis_kelamin': jenisKelamin,
+      'tanggal_lahir': tanggalLahir?.toIso8601String().split('T')[0],
+      'asal_daerah': asalDaerah,
       'jabatan': jabatan,
       'keterangan': keterangan,
       'foto_profil': fotoProfil,
@@ -164,7 +174,6 @@ class UserModel {
       'admin_level': adminLevel,
       'admin_org_id': adminOrgId,
       'current_org_id': currentOrgId,
-      'status_warga': statusWarga,
       'keperluan': keperluan,
       'detail_keperluan': detailKeperluan,
       'no_wa': noWa,
@@ -183,6 +192,9 @@ class UserModel {
     String? password,
     String? asal,
     String? status,
+    String? jenisKelamin,
+    DateTime? tanggalLahir,
+    String? asalDaerah,
     String? jabatan,
     String? keterangan,
     String? fotoProfil,
@@ -193,7 +205,6 @@ class UserModel {
     String? currentOrgId,
     DateTime? createdAt,
     DateTime? updatedAt,
-    String? statusWarga,
     String? keperluan,
     String? detailKeperluan,
     String? noWa,
@@ -209,6 +220,9 @@ class UserModel {
       password: password ?? this.password,
       asal: asal ?? this.asal,
       status: status ?? this.status,
+      jenisKelamin: jenisKelamin ?? this.jenisKelamin,
+      tanggalLahir: tanggalLahir ?? this.tanggalLahir,
+      asalDaerah: asalDaerah ?? this.asalDaerah,
       jabatan: jabatan ?? this.jabatan,
       keterangan: keterangan ?? this.keterangan,
       fotoProfil: fotoProfil ?? this.fotoProfil,
@@ -219,7 +233,6 @@ class UserModel {
       currentOrgId: currentOrgId ?? this.currentOrgId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      statusWarga: statusWarga ?? this.statusWarga,
       keperluan: keperluan ?? this.keperluan,
       detailKeperluan: detailKeperluan ?? this.detailKeperluan,
       noWa: noWa ?? this.noWa,

@@ -526,9 +526,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            if (user['status_warga'] != null)
+                            if (user['asal'] != null)
                               _buildInfoBadge(
-                                user['status_warga'],
+                                user['asal'],
                                 Icons.verified_user,
                                 Colors.blue,
                               ),
@@ -1158,12 +1158,20 @@ class _PenggunaListPageState extends State<PenggunaListPage>
     final usernameCtrl = TextEditingController(text: user['username']);
     final passwordCtrl = TextEditingController(text: user['password'] ?? '');
     final noWaCtrl = TextEditingController(text: user['no_wa'] ?? '');
-    final asalCtrl = TextEditingController(text: user['asal'] ?? '');
+    final asalDaerahCtrl = TextEditingController(
+      text: user['asal_daerah'] ?? '',
+    );
     final detailKeperluanCtrl = TextEditingController(
       text: user['detail_keperluan'] ?? '',
     );
 
-    String? statusWarga = user['status_warga'];
+    String? statusWarga =
+        user['asal']; // 'asal' now stores 'Warga Asli' / 'Perantau'
+    String? statusNikah = user['status'] ?? 'Belum Kawin';
+    String? jenisKelamin = user['jenis_kelamin'];
+    DateTime? tglLahir = user['tanggal_lahir'] != null
+        ? DateTime.parse(user['tanggal_lahir'])
+        : null;
     String? keperluan = user['keperluan'];
 
     // Org Hierarchy Initial State
@@ -1245,15 +1253,67 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                       ),
                       keyboardType: TextInputType.phone,
                     ),
+                    const SizedBox(height: 12),
+
+                    // JENIS KELAMIN
+                    DropdownButtonFormField<String>(
+                      initialValue: jenisKelamin,
+                      decoration: const InputDecoration(
+                        labelText: 'Jenis Kelamin',
+                      ),
+                      items: ['Pria', 'Wanita'].map((s) {
+                        return DropdownMenuItem(value: s, child: Text(s));
+                      }).toList(),
+                      onChanged: (val) =>
+                          setStateDialog(() => jenisKelamin = val),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // STATUS NIKAH
+                    DropdownButtonFormField<String>(
+                      initialValue: statusNikah,
+                      decoration: const InputDecoration(
+                        labelText: 'Status Pernikahan',
+                      ),
+                      items: ['Kawin', 'Belum Kawin'].map((s) {
+                        return DropdownMenuItem(value: s, child: Text(s));
+                      }).toList(),
+                      onChanged: (val) =>
+                          setStateDialog(() => statusNikah = val),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // TANGGAL LAHIR
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: tglLahir ?? DateTime(2000),
+                          firstDate: DateTime(1900),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setStateDialog(() => tglLahir = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Tanggal Lahir',
+                        ),
+                        child: Text(
+                          tglLahir == null
+                              ? 'Pilih Tanggal'
+                              : "${tglLahir!.day}/${tglLahir!.month}/${tglLahir!.year}",
+                        ),
+                      ),
+                    ),
 
                     const SizedBox(height: 24),
                     // --- STATUS WARGA ---
                     _buildSectionHeader('Status & Keperluan'),
                     DropdownButtonFormField<String>(
-                      value: statusWarga,
-                      decoration: const InputDecoration(
-                        labelText: 'Status Warga',
-                      ),
+                      initialValue: statusWarga,
+                      decoration: const InputDecoration(labelText: 'Asal'),
                       items: ['Warga Asli', 'Perantau'].map((s) {
                         return DropdownMenuItem(value: s, child: Text(s));
                       }).toList(),
@@ -1264,14 +1324,14 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     if (statusWarga == 'Perantau') ...[
                       const SizedBox(height: 12),
                       TextField(
-                        controller: asalCtrl,
+                        controller: asalDaerahCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Asal Daerah',
+                          labelText: 'Asal Daerah (Kota)',
                         ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: keperluan,
+                        initialValue: keperluan,
                         decoration: const InputDecoration(
                           labelText: 'Keperluan',
                         ),
@@ -1295,7 +1355,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     _buildSectionHeader('Penempatan Organisasi'),
                     // DAERAH
                     DropdownButtonFormField<String>(
-                      value: selDaerahId,
+                      initialValue: selDaerahId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Daerah'),
                       items: listDaerah.map((o) {
@@ -1316,7 +1376,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     const SizedBox(height: 12),
                     // DESA
                     DropdownButtonFormField<String>(
-                      value: selDesaId,
+                      initialValue: selDesaId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Desa'),
                       items: listDesa.map((o) {
@@ -1336,7 +1396,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     const SizedBox(height: 12),
                     // KELOMPOK
                     DropdownButtonFormField<String>(
-                      value: selKelompokId,
+                      initialValue: selKelompokId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Kelompok'),
                       items: listKelompok.map((o) {
@@ -1355,7 +1415,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     const SizedBox(height: 12),
                     // KATEGORI
                     DropdownButtonFormField<String>(
-                      value: selKategoriId,
+                      initialValue: selKategoriId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       items: listKategori.map((o) {
@@ -1393,8 +1453,13 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           'username': usernameCtrl.text,
                           'password': passwordCtrl.text,
                           'no_wa': noWaCtrl.text,
-                          'asal': asalCtrl.text,
-                          'status_warga': statusWarga,
+                          'asal': statusWarga, // Citizen Status
+                          'status': statusNikah, // Marriage Status
+                          'jenis_kelamin': jenisKelamin,
+                          'tanggal_lahir': tglLahir?.toIso8601String().split(
+                            'T',
+                          )[0],
+                          'asal_daerah': asalDaerahCtrl.text, // City
                           'keperluan': keperluan,
                           'detail_keperluan': detailKeperluanCtrl.text,
                           'org_daerah_id': selDaerahId,
@@ -1903,7 +1968,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           spacing: 6,
                           runSpacing: 6,
                           children: [
-                            if (user['status_warga'] != null)
+                            if (user['asal'] != null)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -1915,10 +1980,52 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                                   border: Border.all(color: Colors.blue[100]!),
                                 ),
                                 child: Text(
-                                  user['status_warga'],
+                                  user['asal'],
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.blue[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            if (user['status'] != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.purple[100]!,
+                                  ),
+                                ),
+                                child: Text(
+                                  user['status'],
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.purple[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            if (user['jenis_kelamin'] != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.teal[100]!),
+                                ),
+                                child: Text(
+                                  user['jenis_kelamin'],
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.teal[700],
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),

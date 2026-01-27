@@ -43,6 +43,13 @@ class _RegisterPageState extends State<RegisterPage> {
   final _detailKeperluanController = TextEditingController();
   final _noWaController = TextEditingController();
 
+  String? _selectedJenisKelamin;
+  String? _selectedMarriageStatus;
+  DateTime? _selectedTanggalLahir;
+
+  final List<String> _genderOptions = ['Pria', 'Wanita'];
+  final List<String> _marriageStatusOptions = ['Kawin', 'Belum Kawin'];
+
   // Daftar status
   final List<String> _statusOptions = ['Warga Asli', 'Perantau'];
   final List<String> _keperluanOptions = ['MT', 'Kuliah', 'Bekerja'];
@@ -164,6 +171,32 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedTanggalLahir ?? DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF1A5F2D),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedTanggalLahir) {
+      setState(() {
+        _selectedTanggalLahir = picked;
+      });
+    }
+  }
+
   void _register() async {
     // 1. Ambil list field yang kosong untuk divalidasi secara cerdas
     List<String> missingFields = [];
@@ -228,10 +261,13 @@ class _RegisterPageState extends State<RegisterPage> {
           nama: _namaController.text.trim(),
           username: _usernameController.text.trim(),
           password: _passwordController.text,
-          asal: _asalController.text.trim().isEmpty
+          asal: _selectedStatus,
+          status: _selectedMarriageStatus,
+          jenisKelamin: _selectedJenisKelamin,
+          tanggalLahir: _selectedTanggalLahir,
+          asalDaerah: _asalController.text.trim().isEmpty
               ? null
               : _asalController.text.trim(),
-          statusWarga: _selectedStatus,
           keperluan: _selectedKeperluan,
           detailKeperluan: _detailKeperluanController.text.trim().isEmpty
               ? null
@@ -682,14 +718,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // Status (WAJIB) - Warga Asli / Perantau
                                     DropdownButtonFormField<String>(
-                                      value: _selectedStatus,
+                                      initialValue: _selectedStatus,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
                                       ),
                                       decoration: _inputDecoration(
-                                        'Status',
+                                        'Asal',
                                         Icons.how_to_reg_outlined,
                                       ),
                                       items: _statusOptions.map((status) {
@@ -707,6 +743,99 @@ class _RegisterPageState extends State<RegisterPage> {
                                         }
                                         return null;
                                       },
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // STATUS (Kawin / Belum Kawin)
+                                    DropdownButtonFormField<String>(
+                                      initialValue: _selectedMarriageStatus,
+                                      dropdownColor: const Color(0xFF1A5F2D),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                      decoration: _inputDecoration(
+                                        'Status',
+                                        Icons.favorite_border,
+                                      ),
+                                      items: _marriageStatusOptions.map((
+                                        status,
+                                      ) {
+                                        return DropdownMenuItem(
+                                          value: status,
+                                          child: Text(status),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(
+                                          () => _selectedMarriageStatus = value,
+                                        );
+                                      },
+                                      validator: (value) {
+                                        if (value == null) {
+                                          return 'Pilih status pernikahan';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // JENIS KELAMIN
+                                    DropdownButtonFormField<String>(
+                                      initialValue: _selectedJenisKelamin,
+                                      dropdownColor: const Color(0xFF1A5F2D),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                      decoration: _inputDecoration(
+                                        'Jenis Kelamin',
+                                        Icons.person_outline,
+                                      ),
+                                      items: _genderOptions.map((gender) {
+                                        return DropdownMenuItem(
+                                          value: gender,
+                                          child: Text(gender),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(
+                                          () => _selectedJenisKelamin = value,
+                                        );
+                                      },
+                                      validator: (value) {
+                                        if (value == null) {
+                                          return 'Pilih jenis kelamin';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // TANGGAL LAHIR
+                                    GestureDetector(
+                                      onTap: () => _selectDate(context),
+                                      child: AbsorbPointer(
+                                        child: TextFormField(
+                                          key: ValueKey(_selectedTanggalLahir),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                          ),
+                                          decoration: _inputDecoration(
+                                            _selectedTanggalLahir == null
+                                                ? 'Pilih Tanggal Lahir'
+                                                : 'Tanggal Lahir: ${_selectedTanggalLahir!.day}/${_selectedTanggalLahir!.month}/${_selectedTanggalLahir!.year}',
+                                            Icons.calendar_today_outlined,
+                                          ),
+                                          validator: (value) {
+                                            if (_selectedTanggalLahir == null) {
+                                              return 'Tanggal lahir wajib diisi';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
                                     ),
                                     const SizedBox(height: 12),
 
@@ -794,7 +923,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                       // Keperluan (MT/Kuliah/Bekerja)
                                       DropdownButtonFormField<String>(
-                                        value: _selectedKeperluan,
+                                        initialValue: _selectedKeperluan,
                                         dropdownColor: const Color(0xFF1A5F2D),
                                         style: const TextStyle(
                                           color: Colors.white,
@@ -859,7 +988,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 1. Daerah (Level 0)
                                     DropdownButtonFormField<String>(
-                                      value: _selectedDaerah,
+                                      initialValue: _selectedDaerah,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -898,7 +1027,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 2. Desa (Level 1)
                                     DropdownButtonFormField<String>(
-                                      value: _selectedDesa,
+                                      initialValue: _selectedDesa,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -945,7 +1074,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 3. Kelompok (Level 2)
                                     DropdownButtonFormField<String>(
-                                      value: _selectedKelompok,
+                                      initialValue: _selectedKelompok,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -990,7 +1119,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 4. Kelas / Kategori (Level 3)
                                     DropdownButtonFormField<String>(
-                                      value: _selectedKelas,
+                                      initialValue: _selectedKelas,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,

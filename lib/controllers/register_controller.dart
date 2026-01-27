@@ -42,8 +42,11 @@ class RegisterController {
     required String nama,
     required String username,
     required String password,
-    required String? asal,
-    required String? statusWarga,
+    required String? asal, // Citizen Status
+    required String? status, // Marriage Status
+    required String? jenisKelamin,
+    required DateTime? tanggalLahir,
+    required String? asalDaerah, // Origin City
     required String? keperluan,
     required String? detailKeperluan,
     File? fotoProfilFile,
@@ -51,7 +54,7 @@ class RegisterController {
     required String? selectedDesa,
     required String? selectedKelompok,
     required String? selectedKelas,
-    required String? noWa, // New Parameter
+    required String? noWa,
   }) async {
     try {
       // 1. Determine Organization ID (Lowest Level)
@@ -74,7 +77,10 @@ class RegisterController {
         nama: nama,
         password: password,
         asal: asal,
-        statusWarga: statusWarga,
+        status: status ?? 'Belum Kawin',
+        jenisKelamin: jenisKelamin,
+        tanggalLahir: tanggalLahir,
+        asalDaerah: asalDaerah,
         keperluan: keperluan,
         detailKeperluan: detailKeperluan,
         jabatan: null,

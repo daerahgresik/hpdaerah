@@ -1545,7 +1545,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
             const LinearProgressIndicator()
           else
             DropdownButtonFormField<String>(
-              value: (_selectedOrgId != null && _selectedOrgId!.isNotEmpty)
+              initialValue:
+                  (_selectedOrgId != null && _selectedOrgId!.isNotEmpty)
                   ? _selectedOrgId
                   : null,
               isExpanded: true,
@@ -1686,7 +1687,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selectedTarget,
+                  initialValue: selectedTarget,
                   items: options
                       .map((o) => DropdownMenuItem(value: o, child: Text(o)))
                       .toList(),

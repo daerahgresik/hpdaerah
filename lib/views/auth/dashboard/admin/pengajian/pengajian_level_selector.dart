@@ -371,7 +371,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: selectedAudience,
+                    initialValue: selectedAudience,
                     decoration: InputDecoration(
                       isDense: true,
                       filled: true,
@@ -428,7 +428,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                       )
                     else
                       DropdownButtonFormField<String>(
-                        value: selectedSubOrgId,
+                        initialValue: selectedSubOrgId,
                         hint: const Text("Pilih Sub-Organisasi"),
                         isExpanded: true,
                         decoration: InputDecoration(
@@ -931,7 +931,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
                   // 3. Target Peserta
                   DropdownButtonFormField<String>(
-                    value: selectedTarget,
+                    initialValue: selectedTarget,
                     items: options
                         .map(
                           (label) => DropdownMenuItem(

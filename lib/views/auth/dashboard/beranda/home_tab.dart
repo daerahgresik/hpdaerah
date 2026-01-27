@@ -27,6 +27,24 @@ class HomeTab extends StatelessWidget {
       case '/izin':
         _showSnackBar(context, "Menu Izin (Segera Hadir)");
         break;
+      case '/khataman':
+        _showSnackBar(context, "Menu Khataman (Segera Hadir)");
+        break;
+      case '/sodakoh':
+        _showSnackBar(context, "Menu Sodakoh (Segera Hadir)");
+        break;
+      case '/pengumuman':
+        _showSnackBar(context, "Menu Pengumuman (Segera Hadir)");
+        break;
+      case '/materi':
+        _showSnackBar(context, "Menu Materi (Segera Hadir)");
+        break;
+      case '/kalender':
+        _showSnackBar(context, "Menu Kalender (Segera Hadir)");
+        break;
+      case '/galeri':
+        _showSnackBar(context, "Menu Galeri (Segera Hadir)");
+        break;
       default:
         _showSnackBar(context, "Menu $route belum tersedia");
     }
@@ -86,10 +104,10 @@ class HomeTab extends StatelessWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 1.1,
+                            crossAxisCount: 3,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.85,
                           ),
                       itemCount: generalMenus.length,
                       itemBuilder: (context, index) {

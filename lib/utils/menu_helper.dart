@@ -42,6 +42,42 @@ class MenuHelper {
         route: '/izin',
         color: Colors.purpleAccent,
       ),
+      MenuItem(
+        title: 'Khataman',
+        icon: Icons.menu_book,
+        route: '/khataman',
+        color: Colors.pinkAccent,
+      ),
+      MenuItem(
+        title: 'Sodakoh',
+        icon: Icons.volunteer_activism,
+        route: '/sodakoh',
+        color: Colors.tealAccent,
+      ),
+      MenuItem(
+        title: 'Pengumuman',
+        icon: Icons.campaign,
+        route: '/pengumuman',
+        color: Colors.orange,
+      ),
+      MenuItem(
+        title: 'Materi',
+        icon: Icons.library_books,
+        route: '/materi',
+        color: Colors.brown,
+      ),
+      MenuItem(
+        title: 'Kalender',
+        icon: Icons.calendar_month,
+        route: '/kalender',
+        color: Colors.redAccent,
+      ),
+      MenuItem(
+        title: 'Galeri',
+        icon: Icons.collections,
+        route: '/galeri',
+        color: Colors.cyan,
+      ),
     ]);
 
     // 2. MENU ADMIN (Hanya jika is_admin == true)
