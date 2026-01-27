@@ -120,16 +120,16 @@ class PresensiService {
           'izin_${userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath = fileName;
 
-      // We use 'fotoprofil' bucket
+      // We use 'fotoizin' bucket (dedicated for leave requests)
       await _client.storage
-          .from('fotoprofil')
+          .from('fotoizin')
           .upload(
             filePath,
             imageFile,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
           );
 
-      return _client.storage.from('fotoprofil').getPublicUrl(filePath);
+      return _client.storage.from('fotoizin').getPublicUrl(filePath);
     } catch (e) {
       throw 'Gagal upload foto izin: $e';
     }

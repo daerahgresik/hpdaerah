@@ -4,6 +4,9 @@ import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:hpdaerah/services/presensi_service.dart';
 
 /// Smart QR Code Tab - Strictly for Active QR Codes
 class QrCodeTab extends StatefulWidget {
@@ -16,7 +19,9 @@ class QrCodeTab extends StatefulWidget {
 
 class _QrCodeTabState extends State<QrCodeTab> {
   final _qrService = PengajianQrService();
+  final _presensiService = PresensiService();
   late Stream<List<PengajianQr>> _qrStream;
+  bool _isProcessing = false;
   Timer? _timer;
 
   @override
@@ -118,7 +123,11 @@ class _QrCodeTabState extends State<QrCodeTab> {
     Color statusColor = Colors.grey;
     IconData statusIcon = Icons.timer;
 
-    if (startTime != null) {
+    if (qr.presensiStatus == 'izin') {
+      statusText = "Anda Izin";
+      statusColor = Colors.orange;
+      statusIcon = Icons.assignment_late;
+    } else if (startTime != null) {
       if (now.isBefore(startTime)) {
         final diff = startTime.difference(now);
         if (diff.inDays > 0) {
@@ -292,30 +301,81 @@ class _QrCodeTabState extends State<QrCodeTab> {
             ),
           ),
 
-          // QR Code Image
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
+          // QR Code or Izin Status
+          if (qr.presensiStatus == 'izin')
+            Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.assignment_late_outlined,
+                      size: 64,
+                      color: Colors.orange[400],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Anda Sudah Lapor Izin",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Status kehadiran Anda terdaftar sebagai IZIN untuk pengajian ini.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
                   ),
                 ],
-                border: Border.all(color: Colors.grey.shade100, width: 2),
               ),
-              child: QrImageView(
-                data: qr.qrCode,
-                version: QrVersions.auto,
-                size: 180,
-                backgroundColor: Colors.white,
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                    ),
+                  ],
+                  border: Border.all(color: Colors.grey.shade100, width: 2),
+                ),
+                child: QrImageView(
+                  data: qr.qrCode,
+                  version: QrVersions.auto,
+                  size: 180,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
-          ),
+
+            // Lapor Izin Button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: OutlinedButton.icon(
+                onPressed: () => _showIzinDialog(qr),
+                icon: const Icon(Icons.assignment_late_outlined, size: 18),
+                label: const Text("Tidak bisa hadir? Lapor Izin"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange[800],
+                  side: BorderSide(color: Colors.orange[300]!),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16), // Padding bottom for the card
         ],
       ),
@@ -353,6 +413,177 @@ class _QrCodeTabState extends State<QrCodeTab> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showIzinDialog(PengajianQr qr) {
+    final noteCtrl = TextEditingController();
+    File? selectedImage;
+    final picker = ImagePicker();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              "Lapor Izin / Sakit",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Alasan Tidak Hadir:",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: "Contoh: Sakit flu, Kerja lembur, dll",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Foto Bukti (Wajib Kamera):",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.camera,
+                        imageQuality: 50,
+                      );
+                      if (picked != null) {
+                        setDialogState(() {
+                          selectedImage = File(picked.path);
+                        });
+                      }
+                    },
+                    child: Container(
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: selectedImage != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                selectedImage!,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.grey[400],
+                                  size: 40,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Klik untuk ambil foto",
+                                  style: TextStyle(color: Colors.grey[500]),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Batal"),
+              ),
+              ElevatedButton(
+                onPressed: _isProcessing
+                    ? null
+                    : () async {
+                        if (noteCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Alasan wajib diisi")),
+                          );
+                          return;
+                        }
+                        if (selectedImage == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Foto bukti wajib")),
+                          );
+                          return;
+                        }
+
+                        Navigator.pop(ctx);
+                        setState(() => _isProcessing = true);
+
+                        try {
+                          await _presensiService.submitLeaveRequest(
+                            pengajianId: qr.pengajianId,
+                            userId: widget.user.id!,
+                            keterangan: noteCtrl.text.trim(),
+                            imageFile: selectedImage!,
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Laporan izin terkirim!"),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Gagal: $e"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) {
+                            setState(() => _isProcessing = false);
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A5F2D),
+                  foregroundColor: Colors.white,
+                ),
+                child: _isProcessing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text("Kirim Laporan"),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
