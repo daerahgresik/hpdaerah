@@ -10,6 +10,7 @@ import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_p
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayatpengajian.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/rekap_pengajian_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/khataman/khataman_page.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -31,7 +32,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   bool _showCreateRoom = false;
   bool _showActiveRoom = false;
   bool _showHistoryRoom = false; // New Menu State
-  bool _showSearchRoom = false;
+  bool _showKhataman = false;
+  bool _showSearchRoom = false; // Still needed for logic inside Active Room
 
   // For Search Room logic
   final _searchCodeCtrl = TextEditingController();
@@ -383,23 +385,24 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 Expanded(
                   child: _buildMenuCard(
                     context,
-                    title: 'Cari Room',
-                    icon: _showSearchRoom
+                    title: 'Khataman',
+                    icon: _showKhataman
                         ? Icons.keyboard_arrow_up
-                        : Icons.search_rounded,
-                    color: Colors.blueAccent,
+                        : Icons.auto_stories_rounded,
+                    color: Colors.amber.shade700,
                     onTap: () {
                       setState(() {
-                        final newState = !_showSearchRoom;
-                        _showSearchRoom = newState;
+                        final newState = !_showKhataman;
+                        _showKhataman = newState;
                         if (newState) {
                           _showCreateRoom = false;
                           _showActiveRoom = false;
                           _showHistoryRoom = false;
+                          _showSearchRoom = false;
                         }
                       });
                     },
-                    isActive: _showSearchRoom,
+                    isActive: _showKhataman,
                   ),
                 ),
               ],
@@ -502,11 +505,18 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               ),
             ],
 
+            // INLINE KHATAMAN (UNDER CONSTRUCTION)
+            if (_showKhataman) ...[
+              const SizedBox(height: 24),
+              const KhatamanPage(),
+            ],
+
             // DEFAULT: Show Insight Dashboard when no menu is selected
             if (!_showCreateRoom &&
                 !_showActiveRoom &&
                 !_showSearchRoom &&
-                !_showHistoryRoom) ...[
+                !_showHistoryRoom &&
+                !_showKhataman) ...[
               const SizedBox(height: 24),
               _buildInsightDashboard(context),
             ],
@@ -971,16 +981,44 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 8.0),
-          child: Text(
-            "Room yang sedang berjalan",
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.blueGrey,
+        Row(
+          children: [
+            const Text(
+              "Room yang sedang berjalan",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.blueGrey,
+              ),
             ),
-          ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showSearchRoom = !_showSearchRoom;
+                  if (_showSearchRoom) {
+                    _showKhataman = false;
+                    _showHistoryRoom = false;
+                    _showCreateRoom = false;
+                    // Keep _showActiveRoom true so we stay in this context
+                  }
+                });
+              },
+              icon: Icon(
+                _showSearchRoom ? Icons.close : Icons.search,
+                size: 16,
+                color: Colors.blue,
+              ),
+              label: Text(
+                _showSearchRoom ? "Tutup Cari" : "Cari Kode Room",
+                style: const TextStyle(fontSize: 11, color: Colors.blue),
+              ),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ],
         ),
         StreamBuilder<List<Pengajian>>(
           stream: _activeRoomStream,
