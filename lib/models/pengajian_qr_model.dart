@@ -16,6 +16,8 @@ class PengajianQr {
   final DateTime? pengajianEndedAt;
   final String? pengajianDescription;
   final String? targetAudience;
+  final List<String>? materiGuru;
+  final String? materiIsi;
   final String? presensiStatus; // hadir, izin, dll.
 
   PengajianQr({
@@ -32,6 +34,8 @@ class PengajianQr {
     this.pengajianEndedAt,
     this.pengajianDescription,
     this.targetAudience,
+    this.materiGuru,
+    this.materiIsi,
     this.presensiStatus,
   });
 
@@ -76,6 +80,10 @@ class PengajianQr {
       targetAudience:
           pengajian?['target_audience'] as String? ??
           json['target_audience'] as String?,
+      materiGuru: (pengajian?['materi_guru'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      materiIsi: pengajian?['materi_isi'] as String?,
       presensiStatus: json['presensi_status'] as String?,
     );
   }
@@ -109,6 +117,8 @@ class PengajianQr {
     DateTime? pengajianEndedAt,
     String? pengajianDescription,
     String? targetAudience,
+    List<String>? materiGuru,
+    String? materiIsi,
     String? presensiStatus,
   }) {
     return PengajianQr(
@@ -125,6 +135,8 @@ class PengajianQr {
       pengajianEndedAt: pengajianEndedAt ?? this.pengajianEndedAt,
       pengajianDescription: pengajianDescription ?? this.pengajianDescription,
       targetAudience: targetAudience ?? this.targetAudience,
+      materiGuru: materiGuru ?? this.materiGuru,
+      materiIsi: materiIsi ?? this.materiIsi,
       presensiStatus: presensiStatus ?? this.presensiStatus,
     );
   }

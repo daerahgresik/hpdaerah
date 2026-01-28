@@ -58,7 +58,12 @@ class _RekapPengajianPageState extends State<RekapPengajianPage> {
               // 1. STATS OVERVIEW
               _buildStatsHeader(hadir, izin, alpha, total),
 
-              // 2. SEARCH BAR
+              // 2. MATERI INFO (Jika ada)
+              if (widget.pengajian.materiIsi != null ||
+                  (widget.pengajian.materiGuru?.isNotEmpty ?? false))
+                _buildMateriHeader(),
+
+              // 3. SEARCH BAR
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -110,6 +115,78 @@ class _RekapPengajianPageState extends State<RekapPengajianPage> {
           _buildStatItem("Izin", izin, Colors.orange),
           _buildStatItem("Alpha", alpha, Colors.red),
           _buildStatItem("Total", total, Colors.blue),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMateriHeader() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.menu_book, color: Color(0xFF1A5F2D), size: 18),
+              SizedBox(width: 8),
+              Text(
+                "Ringkasan Materi",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF1A5F2D),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          if (widget.pengajian.materiGuru != null &&
+              widget.pengajian.materiGuru!.isNotEmpty) ...[
+            const Text(
+              "Guru / Narasumber:",
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.pengajian.materiGuru!.join(", "),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (widget.pengajian.materiIsi != null) ...[
+            const Text(
+              "Kesimpulan:",
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.pengajian.materiIsi!,
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+          ],
         ],
       ),
     );

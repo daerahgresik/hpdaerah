@@ -1291,6 +1291,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                           initialDate: tglLahir ?? DateTime(2000),
                           firstDate: DateTime(1900),
                           lastDate: DateTime.now(),
+                          initialDatePickerMode: DatePickerMode.year,
                         );
                         if (picked != null) {
                           setStateDialog(() => tglLahir = picked);

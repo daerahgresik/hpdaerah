@@ -105,7 +105,14 @@ class _QrCodeTabState extends State<QrCodeTab> {
     }
 
     return RefreshIndicator(
-      onRefresh: () async => setState(() {}),
+      onRefresh: () async {
+        if (mounted) {
+          setState(() {
+            _initStream();
+          });
+        }
+        await Future.delayed(const Duration(milliseconds: 500));
+      },
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: aktifList.length,
@@ -306,6 +313,24 @@ class _QrCodeTabState extends State<QrCodeTab> {
                     Colors.orangeAccent.shade700,
                   ),
                 ],
+                if (qr.materiGuru != null && qr.materiGuru!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _buildInfoRow(
+                    Icons.person_rounded,
+                    "Pembawa Materi / Guru",
+                    qr.materiGuru!.join(", "),
+                    Colors.teal,
+                  ),
+                ],
+                if (qr.materiIsi != null && qr.materiIsi!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _buildInfoRow(
+                    Icons.menu_book_rounded,
+                    "Topik / Isi Materi",
+                    qr.materiIsi!,
+                    Colors.brown,
+                  ),
+                ],
               ],
             ),
           ),
@@ -333,11 +358,16 @@ class _QrCodeTabState extends State<QrCodeTab> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.shade100),
               ),
-              child: QrImageView(
-                data: qr.qrCode,
-                version: QrVersions.auto,
-                size: 130, // Even smaller
-                backgroundColor: Colors.white,
+              child: SizedBox(
+                width: 130,
+                height: 130,
+                child: QrImageView(
+                  data: qr.qrCode,
+                  version: QrVersions.auto,
+                  size: 130,
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                ),
               ),
             ),
             // Lapor Izin Button - Ultra Slim
@@ -403,7 +433,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
                 ),
                 Text(
                   value,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 10,
@@ -663,10 +693,10 @@ class _QrCodeTabState extends State<QrCodeTab> {
   String _getTimeRange(DateTime? start, DateTime? end) {
     if (start == null) return "-";
     final s =
-        "${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}";
+        "${start.toLocal().hour.toString().padLeft(2, '0')}:${start.toLocal().minute.toString().padLeft(2, '0')}";
     if (end == null) return s;
     final e =
-        "${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}";
+        "${end.toLocal().hour.toString().padLeft(2, '0')}:${end.toLocal().minute.toString().padLeft(2, '0')}";
     return "$s - $e";
   }
 

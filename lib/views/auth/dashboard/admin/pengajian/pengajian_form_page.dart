@@ -2,6 +2,8 @@
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
+import 'package:hpdaerah/models/target_kriteria_model.dart';
+import 'package:hpdaerah/services/target_kriteria_service.dart';
 
 class PengajianFormPage extends StatefulWidget {
   final UserModel user;
@@ -28,10 +30,13 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
   late TextEditingController _deskripsiController;
   late TextEditingController _roomCodeController;
   final _service = PengajianService();
+  final _targetService = TargetKriteriaService();
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  String? _selectedTarget; // Target Peserta
+  String? _selectedTarget; // Nama Target (Legacy/Display)
+  String? _selectedTargetKriteriaId; // Link ke tabel target_kriteria
+  List<TargetKriteria> _systemTargets = [];
   bool _isLoading = false;
 
   @override
@@ -49,6 +54,26 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
     );
     _roomCodeController = TextEditingController();
     _selectedTarget = widget.template?.targetAudience;
+    _selectedTargetKriteriaId = widget.template?.targetKriteriaId;
+    _loadTargets();
+  }
+
+  Future<void> _loadTargets() async {
+    try {
+      final targets = await _targetService.fetchAvailableTargets(
+        orgId: widget.orgId,
+        orgDaerahId: widget.user.orgDaerahId,
+        orgDesaId: widget.user.orgDesaId,
+        orgKelompokId: widget.user.orgKelompokId,
+      );
+      if (mounted) {
+        setState(() {
+          _systemTargets = targets;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading targets: $e');
+    }
   }
 
   @override
@@ -121,6 +146,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
         location: _lokasiController.text,
         description: _deskripsiController.text,
         targetAudience: _selectedTarget,
+        targetKriteriaId: _selectedTargetKriteriaId,
         roomCode: _roomCodeController.text.trim().toUpperCase(),
         startedAt: startedAt,
         // Full hierarchical context
@@ -204,21 +230,34 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
               // Target Peserta
               _buildLabel('Target Peserta'),
               const SizedBox(height: 8),
-              // Target Peserta
               DropdownButtonFormField<String>(
-                value: _selectedTarget,
-                items: ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit']
-                    .map(
-                      (label) =>
-                          DropdownMenuItem(value: label, child: Text(label)),
-                    )
-                    .toList(),
-                onChanged: (val) => setState(() => _selectedTarget = val),
-                // ...
+                value: _selectedTargetKriteriaId,
+                items: _systemTargets.map((t) {
+                  return DropdownMenuItem(
+                    value: t.id,
+                    child: Text(t.namaTarget),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedTargetKriteriaId = val;
+                    _selectedTarget = _systemTargets
+                        .firstWhere((element) => element.id == val)
+                        .namaTarget;
+                  });
+                },
                 decoration: _inputDecoration('Pilih target peserta'),
                 validator: (val) =>
                     val == null ? 'Target peserta wajib dipilih' : null,
               ),
+              if (_systemTargets.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    "* Belum ada target. Buat dulu di halaman depan Admin.",
+                    style: TextStyle(color: Colors.red[700], fontSize: 11),
+                  ),
+                ),
               const SizedBox(height: 20),
 
               // Tanggal & Waktu
@@ -330,7 +369,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 "* Bagikan kode ini ke Admin lain agar mereka bisa bergabung.",
                 style: TextStyle(
                   fontSize: 11,

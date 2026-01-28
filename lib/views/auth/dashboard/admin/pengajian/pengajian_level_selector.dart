@@ -2,10 +2,10 @@
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
-import 'package:hpdaerah/models/materi_model.dart';
-import 'package:hpdaerah/services/materi_service.dart';
 import 'package:hpdaerah/services/organization_service.dart';
 import 'package:hpdaerah/models/organization_model.dart';
+import 'package:hpdaerah/services/target_kriteria_service.dart';
+import 'package:hpdaerah/models/target_kriteria_model.dart';
 
 class PengajianLevelSelector extends StatefulWidget {
   final UserModel user;
@@ -25,14 +25,34 @@ class PengajianLevelSelector extends StatefulWidget {
 
 class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
   final _pengajianService = PengajianService();
-  final _materiService = MateriService();
   final _orgService = OrganizationService();
+  final _targetService = TargetKriteriaService();
   late Stream<List<Pengajian>> _templatesStream;
+
+  // Inline Management State
+  bool _isTargetExpanded = false;
+  List<TargetKriteria> _targetList = [];
+  bool _isLoadingTargets = false;
 
   @override
   void initState() {
     super.initState();
     _initStream();
+    _fetchTargets();
+  }
+
+  Future<void> _fetchTargets() async {
+    if (mounted) setState(() => _isLoadingTargets = true);
+    final list = await _targetService.fetchAllTargetsInHierarchy(
+      orgId: widget.orgId,
+      adminLevel: widget.user.adminLevel ?? 4,
+    );
+    if (mounted) {
+      setState(() {
+        _targetList = list;
+        _isLoadingTargets = false;
+      });
+    }
   }
 
   @override
@@ -73,6 +93,10 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
         return Column(
           children: [
+            // 0. KELOLA TARGET PESERTA (INLINE)
+            _buildInlineTargetManager(),
+            const SizedBox(height: 12),
+
             // 1. DAERAH (Hanya muncul untuk Super Admin dan Admin Daerah)
             if (widget.adminLevel <= 1) ...[
               _buildSection(
@@ -161,13 +185,16 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color.withValues(alpha: 0.8),
-                  letterSpacing: 1.2,
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color.withValues(alpha: 0.8),
+                    letterSpacing: 1.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -204,12 +231,17 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                               color: Colors.amber[700],
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              t.templateName ?? 'Template',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 150),
+                              child: Text(
+                                t.templateName ?? 'Template',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ),
                           ],
@@ -309,15 +341,27 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
       DateTime.now().add(const Duration(hours: 1)),
     );
 
-    // Audience selection
-    final audienceOptions = ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit'];
+    // Dynamic Audience selection from Database
+    List<TargetKriteria> customTargets = await _targetService
+        .fetchAvailableTargets(
+          orgId: widget.orgId,
+          orgDaerahId: widget.user.orgDaerahId,
+          orgDesaId: widget.user.orgDesaId,
+          orgKelompokId: widget.user.orgKelompokId,
+        );
+
+    final audienceOptions = [
+      'Semua',
+      ...customTargets.map((t) => t.namaTarget),
+    ];
+
     String selectedAudience = template.targetAudience ?? 'Semua';
+    String? selectedTargetKriteriaId = template.targetKriteriaId;
+
+    // Validation: make sure selectedAudience exists in options
     if (!audienceOptions.contains(selectedAudience)) {
-      if (selectedAudience == 'Muda-mudi') {
-        selectedAudience = 'Muda - mudi';
-      } else {
-        selectedAudience = 'Semua';
-      }
+      selectedAudience = 'Semua';
+      selectedTargetKriteriaId = null;
     }
 
     // Sub-organization selection
@@ -347,6 +391,11 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
       {'guru': TextEditingController(), 'isi': TextEditingController()},
     ];
     final roomCodeController = TextEditingController(text: template.roomCode);
+    final titleController = TextEditingController(text: template.title);
+    final locationController = TextEditingController(text: template.location);
+    final descriptionController = TextEditingController(
+      text: template.description,
+    );
 
     await showDialog(
       context: context,
@@ -359,9 +408,38 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildDetailRow("Nama", template.title),
-                  _buildDetailRow("Lokasi", template.location ?? '-'),
-                  _buildDetailRow("Deskripsi", template.description ?? '-'),
+                  const Text(
+                    "Sesuaikan Info (Opsional):",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: "Nama Pengajian",
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: locationController,
+                    decoration: const InputDecoration(
+                      labelText: "Lokasi",
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: "Deskripsi",
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    maxLines: 2,
+                  ),
                   const SizedBox(height: 16),
 
                   // 1. SELECT TARGET AUDIENCE
@@ -386,13 +464,27 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     ),
                     items: audienceOptions
                         .map(
-                          (val) =>
-                              DropdownMenuItem(value: val, child: Text(val)),
+                          (val) => DropdownMenuItem<String>(
+                            value: val,
+                            child: Text(val),
+                          ),
                         )
                         .toList(),
                     onChanged: (val) {
-                      if (val != null)
-                        setStateDialog(() => selectedAudience = val);
+                      if (val != null) {
+                        setStateDialog(() {
+                          selectedAudience = val;
+                          // Update the ID find the matching target
+                          if (val == 'Semua') {
+                            selectedTargetKriteriaId = null;
+                          } else {
+                            final match = customTargets.firstWhere(
+                              (t) => t.namaTarget == val,
+                            );
+                            selectedTargetKriteriaId = match.id;
+                          }
+                        });
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
@@ -743,14 +835,26 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                       }
                     }
 
-                    // Buat Pengajian dari Template
+                    // 2. Consolidate Materi (Jika diisi)
+                    final List<String> guruNames = [];
+                    final List<String> contentParts = [];
+
+                    for (var entry in materiEntries) {
+                      final name = entry['guru']?.text.trim() ?? '';
+                      final content = entry['isi']?.text.trim() ?? '';
+
+                      if (name.isNotEmpty) guruNames.add(name);
+                      if (content.isNotEmpty) contentParts.add(content);
+                    }
+
+                    // 3. Buat Pengajian (Termasuk Materi)
                     await _pengajianService.createPengajian(
                       Pengajian(
                         id: '',
                         orgId: targetOrgId,
-                        title: template.title,
-                        description: template.description,
-                        location: template.location,
+                        title: titleController.text,
+                        description: descriptionController.text,
+                        location: locationController.text,
                         targetAudience: selectedAudience,
                         roomCode: roomCodeController.text.trim().toUpperCase(),
                         isTemplate: false,
@@ -760,43 +864,13 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                         orgDaerahId: orgDaerahId,
                         orgDesaId: orgDesaId,
                         orgKelompokId: orgKelompokId,
+                        materiGuru: guruNames.isNotEmpty ? guruNames : null,
+                        materiIsi: contentParts.isNotEmpty
+                            ? contentParts.join(", ")
+                            : null,
+                        targetKriteriaId: selectedTargetKriteriaId,
                       ),
                     );
-
-                    // 2. Buat Materi (Jika diisi)
-                    // Consolidate data from entries
-                    final List<String> guruNames = [];
-                    final List<String> consolidatedContent = [];
-
-                    for (var entry in materiEntries) {
-                      final name = entry['guru']?.text.trim() ?? '';
-                      final content = entry['isi']?.text.trim() ?? '';
-
-                      if (name.isNotEmpty || content.isNotEmpty) {
-                        if (name.isNotEmpty) guruNames.add(name);
-                        String entryDisplayContent = "";
-                        if (name.isNotEmpty) {
-                          entryDisplayContent += "Guru: $name\n";
-                        }
-                        entryDisplayContent += content;
-                        consolidatedContent.add(entryDisplayContent);
-                      }
-                    }
-
-                    if (consolidatedContent.isNotEmpty) {
-                      final tanggalStr =
-                          "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
-
-                      await _materiService.createMateri(
-                        Materi(
-                          id: '',
-                          orgId: widget.orgId,
-                          tanggal: tanggalStr,
-                          guru: guruNames,
-                          isi: consolidatedContent.join("\n\n---\n\n"),
-                        ),
-                      );
-                    }
 
                     if (context.mounted) {
                       Navigator.pop(ctx);
@@ -827,27 +901,6 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 13, color: Colors.black87),
-          children: [
-            TextSpan(
-              text: "$label: ",
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
-            ),
-            TextSpan(text: value),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showAddTemplateDialog(
     BuildContext context,
     String level, {
@@ -865,20 +918,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
       text: template?.roomCode ?? '',
     );
 
-    final options = ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit'];
-    String selectedTarget = 'Semua';
-
-    if (template?.targetAudience != null) {
-      // Normalize legacy data if needed
-      final val = template!.targetAudience!;
-      if (options.contains(val)) {
-        selectedTarget = val;
-      } else if (val == 'Muda-mudi') {
-        selectedTarget = 'Muda - mudi'; // Fix legacy data mapping
-      } else {
-        selectedTarget = 'Semua';
-      }
-    }
+    String? selectedTargetKriteriaId = template?.targetKriteriaId;
 
     showDialog(
       context: context,
@@ -931,17 +971,19 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
                   // 3. Target Peserta
                   DropdownButtonFormField<String>(
-                    value: selectedTarget,
-                    items: options
-                        .map(
-                          (label) => DropdownMenuItem(
-                            value: label,
-                            child: Text(label),
-                          ),
-                        )
-                        .toList(),
+                    value: selectedTargetKriteriaId,
+                    isExpanded: true,
+                    items: _targetList.map((t) {
+                      return DropdownMenuItem(
+                        value: t.id,
+                        child: Text(
+                          t.namaTarget,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      );
+                    }).toList(),
                     onChanged: (val) =>
-                        setStateDialog(() => selectedTarget = val ?? 'Semua'),
+                        setStateDialog(() => selectedTargetKriteriaId = val),
                     decoration: const InputDecoration(
                       labelText: 'Target Peserta',
                       border: OutlineInputBorder(),
@@ -999,7 +1041,17 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                     title: titleController.text,
                                     description: descController.text,
                                     location: locationController.text,
-                                    targetAudience: selectedTarget,
+                                    targetAudience:
+                                        selectedTargetKriteriaId != null
+                                        ? _targetList
+                                              .firstWhere(
+                                                (t) =>
+                                                    t.id ==
+                                                    selectedTargetKriteriaId,
+                                              )
+                                              .namaTarget
+                                        : null,
+                                    targetKriteriaId: selectedTargetKriteriaId,
                                     roomCode: roomCodeController.text
                                         .trim()
                                         .toUpperCase(),
@@ -1017,7 +1069,17 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                     title: titleController.text,
                                     description: descController.text,
                                     location: locationController.text,
-                                    targetAudience: selectedTarget,
+                                    targetAudience:
+                                        selectedTargetKriteriaId != null
+                                        ? _targetList
+                                              .firstWhere(
+                                                (t) =>
+                                                    t.id ==
+                                                    selectedTargetKriteriaId,
+                                              )
+                                              .namaTarget
+                                        : null,
+                                    targetKriteriaId: selectedTargetKriteriaId,
                                     roomCode: roomCodeController.text
                                         .trim()
                                         .toUpperCase(),
@@ -1112,5 +1174,248 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
         }
       }
     }
+  }
+
+  Widget _buildInlineTargetManager() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            onTap: () => setState(() => _isTargetExpanded = !_isTargetExpanded),
+            leading: const Icon(
+              Icons.settings_suggest,
+              color: Color(0xFF1A5F2D),
+            ),
+            title: const Text(
+              "Manajemen Target Peserta",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            subtitle: const Text(
+              "Kelola kriteria umur & status peserta",
+              style: TextStyle(fontSize: 11),
+            ),
+            trailing: Icon(
+              _isTargetExpanded ? Icons.expand_less : Icons.expand_more,
+            ),
+          ),
+          if (_isTargetExpanded) ...[
+            const Divider(height: 1),
+            if (_isLoadingTargets)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_targetList.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    const Text(
+                      "Belum ada target kustom",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _showAddTargetDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text("Buat Target Pertama"),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Column(
+                children: [
+                  ..._targetList.map((t) {
+                    final isMine = t.orgId == widget.orgId;
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        t.namaTarget,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        "${t.jenisKelamin}, ${t.minUmur}-${t.maxUmur} thn, ${t.statusWarga}, ${t.statusPernikahan}",
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      trailing: isMine
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              onPressed: () async {
+                                await _targetService.deleteTarget(t.id);
+                                _fetchTargets();
+                              },
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                "Pinjaman",
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                    );
+                  }),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton.icon(
+                      onPressed: _showAddTargetDialog,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text("Tambah Target Baru"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A5F2D),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 36),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showAddTargetDialog() {
+    final nameController = TextEditingController();
+    int minUmur = 0;
+    int maxUmur = 100;
+    String selectedJK = 'Semua';
+    String selectedStatus = 'Semua';
+    String selectedKeperluan = 'Semua';
+    String selectedNikah = 'Semua';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: const Text("Buat Target Baru"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: "Nama Target",
+                    hintText: "Contoh: Remaja Perantau Pria",
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Range Umur",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "Min"),
+                        onChanged: (val) => minUmur = int.tryParse(val) ?? 0,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "Max"),
+                        onChanged: (val) => maxUmur = int.tryParse(val) ?? 100,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedJK,
+                  decoration: const InputDecoration(labelText: "Jenis Kelamin"),
+                  items: ['Semua', 'Pria', 'Wanita']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (val) => setModalState(() => selectedJK = val!),
+                ),
+                DropdownButtonFormField<String>(
+                  value: selectedStatus,
+                  decoration: const InputDecoration(labelText: "Status Warga"),
+                  items: ['Semua', 'Warga Asli', 'Perantau']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (val) =>
+                      setModalState(() => selectedStatus = val!),
+                ),
+                DropdownButtonFormField<String>(
+                  value: selectedKeperluan,
+                  decoration: const InputDecoration(labelText: "Keperluan"),
+                  items: ['Semua', 'MT', 'Kuliah', 'Bekerja']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (val) =>
+                      setModalState(() => selectedKeperluan = val!),
+                ),
+                DropdownButtonFormField<String>(
+                  value: selectedNikah,
+                  decoration: const InputDecoration(
+                    labelText: "Status Pernikahan",
+                  ),
+                  items: ['Semua', 'Kawin', 'Belum Kawin']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (val) => setModalState(() => selectedNikah = val!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.isEmpty) return;
+                final newTarget = TargetKriteria(
+                  id: '',
+                  orgId: widget.orgId,
+                  orgDaerahId: widget.user.orgDaerahId,
+                  orgDesaId: widget.user.orgDesaId,
+                  orgKelompokId: widget.user.orgKelompokId,
+                  namaTarget: nameController.text.trim(),
+                  minUmur: minUmur,
+                  maxUmur: maxUmur,
+                  jenisKelamin: selectedJK,
+                  statusWarga: selectedStatus,
+                  keperluan: selectedKeperluan,
+                  statusPernikahan: selectedNikah,
+                  createdBy: widget.user.id,
+                );
+                await _targetService.createTarget(newTarget);
+                Navigator.pop(ctx);
+                _fetchTargets();
+              },
+              child: const Text("Simpan"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

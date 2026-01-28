@@ -15,6 +15,9 @@
   final String? orgDaerahId;
   final String? orgDesaId;
   final String? orgKelompokId;
+  final List<String>? materiGuru;
+  final String? materiIsi;
+  final String? targetKriteriaId; // New
 
   Pengajian({
     required this.id,
@@ -33,6 +36,9 @@
     this.orgDaerahId,
     this.orgDesaId,
     this.orgKelompokId,
+    this.materiGuru,
+    this.materiIsi,
+    this.targetKriteriaId,
   });
 
   factory Pengajian.fromJson(Map<String, dynamic> json) {
@@ -55,6 +61,11 @@
       orgDaerahId: json['org_daerah_id'] as String?,
       orgDesaId: json['org_desa_id'] as String?,
       orgKelompokId: json['org_kelompok_id'] as String?,
+      materiGuru: (json['materi_guru'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      materiIsi: json['materi_isi'] as String?,
+      targetKriteriaId: json['target_kriteria_id'] as String?,
     );
   }
 
@@ -67,8 +78,8 @@
       'location': location,
       'target_audience': targetAudience,
       'room_code': roomCode,
-      'started_at': startedAt.toIso8601String(),
-      'ended_at': endedAt?.toIso8601String(),
+      'started_at': startedAt.toUtc().toIso8601String(),
+      'ended_at': endedAt?.toUtc().toIso8601String(),
       'created_by': createdBy,
       'is_template': isTemplate,
       'template_name': templateName,
@@ -76,6 +87,9 @@
       'org_daerah_id': orgDaerahId,
       'org_desa_id': orgDesaId,
       'org_kelompok_id': orgKelompokId,
+      'materi_guru': materiGuru,
+      'materi_isi': materiIsi,
+      'target_kriteria_id': targetKriteriaId,
     };
   }
 }

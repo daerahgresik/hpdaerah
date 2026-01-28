@@ -1,7 +1,9 @@
 ﻿import 'dart:math';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/pengajian_qr_model.dart';
+import 'package:hpdaerah/models/pengajian_qr_model.dart';
+import 'package:hpdaerah/models/target_kriteria_model.dart';
 
 /// Service untuk mengelola QR Code Pengajian
 /// - Generate QR untuk semua user target saat pengajian dibuat
@@ -31,6 +33,7 @@ class PengajianQrService {
     required String pengajianId,
     required String targetOrgId,
     String? targetAudience,
+    String? targetKriteriaId,
     String? creatorId, // New: always include creator
   }) async {
     try {
@@ -38,6 +41,7 @@ class PengajianQrService {
       final targetUsers = await _getTargetUsers(
         targetOrgId,
         targetAudience: targetAudience,
+        targetKriteriaId: targetKriteriaId,
       );
 
       // 2. Prepare final list of target user IDs
@@ -103,22 +107,80 @@ class PengajianQrService {
   Future<List<String>> _getTargetUsers(
     String orgId, {
     String? targetAudience,
+    String? targetKriteriaId,
   }) async {
     try {
       // 1. Get Absolute Hierarchy Scope
-      // Anyone who belongs to this org at any level (Daerah/Desa/Kelompok)
       final scopeResponse = await _client
           .from('users')
-          .select('id, is_admin, current_org_id')
+          .select('''
+            id, is_admin, current_org_id, 
+            tanggal_lahir, jenis_kelamin, asal, keperluan, status
+          ''')
           .or(
             'org_daerah_id.eq.$orgId,org_desa_id.eq.$orgId,org_kelompok_id.eq.$orgId',
           );
 
       final List<dynamic> usersInScope = scopeResponse as List<dynamic>;
-
       if (usersInScope.isEmpty) return [];
 
-      // 2. Audience Targeting Logic
+      // 2. CHECK FOR DYNAMIC TARGET KRITERIA
+      if (targetKriteriaId != null) {
+        final kriteriaRes = await _client
+            .from('target_kriteria')
+            .select()
+            .eq('id', targetKriteriaId)
+            .maybeSingle();
+
+        if (kriteriaRes != null) {
+          final k = TargetKriteria.fromJson(kriteriaRes);
+          final List<String> filteredIds = [];
+          final now = DateTime.now();
+
+          for (final u in usersInScope) {
+            // Age Check
+            if (u['tanggal_lahir'] != null) {
+              final birthDate = DateTime.parse(u['tanggal_lahir']);
+              int age = now.year - birthDate.year;
+              if (now.month < birthDate.month ||
+                  (now.month == birthDate.month && now.day < birthDate.day)) {
+                age--;
+              }
+              if (age < k.minUmur || age > k.maxUmur) continue;
+            } else if (k.minUmur > 0) {
+              // User has no birthdate but target requires min age
+              continue;
+            }
+
+            // Gender Check
+            if (k.jenisKelamin != 'Semua' &&
+                u['jenis_kelamin'] != k.jenisKelamin) {
+              continue;
+            }
+
+            // Status Check
+            if (k.statusWarga != 'Semua' && u['asal'] != k.statusWarga) {
+              continue;
+            }
+
+            // Keperluan Check
+            if (k.keperluan != 'Semua' && u['keperluan'] != k.keperluan) {
+              continue;
+            }
+
+            // Marriage Status Check
+            if (k.statusPernikahan != 'Semua' &&
+                u['status'] != k.statusPernikahan) {
+              continue;
+            }
+
+            filteredIds.add(u['id'].toString());
+          }
+          return filteredIds;
+        }
+      }
+
+      // 3. Fallback to Legacy Audience Targeting Logic
       String? targetCategory;
       if (targetAudience != null && targetAudience != 'Semua') {
         if (targetAudience == 'Muda - mudi') targetCategory = 'remaja';
@@ -131,8 +193,7 @@ class PengajianQrService {
         return usersInScope.map((u) => u['id'].toString()).toList();
       }
 
-      // 3. For Targeted Rooms: Youth + Admins
-      // First, find which organizations in this hierarchy match the category
+      // 4. For Legacy Targeted Rooms: Youth
       final allChildOrgIds = await _getAllChildOrgIds(orgId);
       allChildOrgIds.add(orgId);
 
@@ -147,15 +208,10 @@ class PengajianQrService {
           .map((o) => o['id'].toString())
           .toList();
 
-      // Include if: User's current_org matches the category
-      // Note: Admins are already in usersInScope. We no longer force every admin
-      // into every targeted room unless they are the creator (handled in parent)
-      // or they belong to the specific category.
       final List<String> targetUserIds = [];
       for (final u in usersInScope) {
         final String? userOrg = u['current_org_id']?.toString();
-
-        if ((userOrg != null && validOrgIdsForCategory.contains(userOrg))) {
+        if (userOrg != null && validOrgIdsForCategory.contains(userOrg)) {
           targetUserIds.add(u['id'].toString());
         }
       }
@@ -194,88 +250,153 @@ class PengajianQrService {
   /// Stream QR Code aktif untuk user tertentu (dengan info pengajian)
   /// Menampilkan QR yang belum digunakan dari pengajian yang masih aktif
   Stream<List<PengajianQr>> streamActiveQrForUser(String userId) {
-    return _client
-        .from('pengajian_qr')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId)
-        .asyncMap((data) async {
-          if (data.isEmpty) return [];
+    // ignore: close_sinks
+    final controller = StreamController<List<PengajianQr>>();
 
-          // 1. Convert stream data to list
-          final qrList = (data as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+    Future<void> refresh() async {
+      try {
+        // 1. Initial Fetch of raw QR data
+        final response = await _client
+            .from('pengajian_qr')
+            .select()
+            .eq('user_id', userId);
 
-          // 2. Get unique pengajian IDs to fetch details
-          final pengajianIds = qrList
-              .map((e) => e['pengajian_id'] as String)
-              .toSet()
-              .toList();
+        final data = List<Map<String, dynamic>>.from(response as List);
 
-          // 3. Fetch all related pengajian in one batch
-          final pengajianRes = await _client
-              .from('pengajian')
-              .select()
-              .filter('id', 'in', pengajianIds);
+        if (data.isEmpty) {
+          if (!controller.isClosed) controller.add([]);
+          return;
+        }
 
-          final pengajianMap = {
-            for (var p in (pengajianRes as List))
-              p['id'] as String: Map<String, dynamic>.from(p as Map),
-          };
+        // 2. Get unique pengajian IDs
+        final pengajianIds = data
+            .map((e) => e['pengajian_id'] as String)
+            .toSet()
+            .toList();
 
-          // 4. Fetch presence statuses for these rooms to avoid showing QR for already checked-in users
-          final presensiRes = await _client
-              .from('presensi')
-              .select('pengajian_id, status')
-              .eq('user_id', userId)
-              .filter('pengajian_id', 'in', pengajianIds);
+        // 3. Batch fetch pengajian details
+        final pengajianRes = await _client
+            .from('pengajian')
+            .select()
+            .filter('id', 'in', pengajianIds);
 
-          final presensiMap = {
-            for (var pr in (presensiRes as List))
-              pr['pengajian_id'] as String: pr['status'] as String,
-          };
+        final pengajianMap = {
+          for (var p in List<Map<String, dynamic>>.from(pengajianRes as List))
+            p['id'] as String: p,
+        };
 
-          final results = <PengajianQr>[];
-          final now = DateTime.now();
+        // 4. Batch fetch presence
+        final presensiRes = await _client
+            .from('presensi')
+            .select('pengajian_id, status')
+            .eq('user_id', userId)
+            .filter('pengajian_id', 'in', pengajianIds);
 
-          for (final qrData in qrList) {
-            final pId = qrData['pengajian_id'] as String;
-            final pData = pengajianMap[pId];
+        final presensiMap = {
+          for (var pr in List<Map<String, dynamic>>.from(presensiRes as List))
+            pr['pengajian_id'] as String: pr['status'] as String,
+        };
 
-            if (pData != null) {
-              // Check if it should be shown
-              final endedAtStr = pData['ended_at'] as String?;
-              final isUsed = qrData['is_used'] as bool? ?? false;
+        final results = <PengajianQr>[];
+        final now = DateTime.now();
 
-              bool isActive = true;
-              if (endedAtStr != null) {
-                final endedAt = DateTime.parse(endedAtStr).toLocal();
-                if (now.isAfter(endedAt)) {
-                  isActive = false;
-                }
-              }
+        for (final qrData in data) {
+          final pId = qrData['pengajian_id'] as String;
+          final pData = pengajianMap[pId];
 
-              // Show if not used AND pengajian hasn't ended
-              if (isActive && !isUsed) {
-                final enrichedData = {
-                  ...qrData,
-                  'pengajian': pData,
-                  'presensi_status': presensiMap[pId],
-                };
-                results.add(PengajianQr.fromJson(enrichedData));
+          if (pData != null) {
+            final endedAtStr = pData['ended_at'] as String?;
+            final isUsed = qrData['is_used'] as bool? ?? false;
+
+            bool isActive = true;
+            if (endedAtStr != null) {
+              final endedAt = DateTime.parse(endedAtStr).toLocal();
+              // Show for 1 more hour after it ends, or just strictly
+              // Using strict here as per logic
+              if (now.isAfter(endedAt)) {
+                isActive = false;
               }
             }
+
+            if (isActive && !isUsed) {
+              final enrichedData = {
+                ...qrData,
+                'pengajian': pData,
+                'presensi_status': presensiMap[pId],
+              };
+              results.add(PengajianQr.fromJson(enrichedData));
+            }
           }
+        }
 
-          // Sort by creation date descending
-          results.sort(
-            (a, b) => (b.createdAt ?? DateTime.now()).compareTo(
-              a.createdAt ?? DateTime.now(),
-            ),
-          );
-
-          return results;
+        // Sort by creation date descending
+        results.sort((a, b) {
+          final dateA = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final dateB = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return dateB.compareTo(dateA);
         });
+
+        if (!controller.isClosed) controller.add(results);
+      } catch (e) {
+        debugPrint("Error in streamActiveQrForUser: $e");
+        // Don't send error to stream to avoid breaking UI, just log it
+      }
+    }
+
+    // Set up Realtime Channel with unique ID
+    final channelId = 'qr_subscription_$userId';
+
+    // Subscribe to changes
+    final channel = _client.channel(channelId);
+
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'pengajian_qr',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            debugPrint("Realtime Update QR: ${payload.eventType}");
+            // Add small delay to ensure DB propagation
+            Future.delayed(const Duration(milliseconds: 500), refresh);
+          },
+        )
+        .subscribe();
+
+    // Separate subscription for presensi to avoid chaining issues if any
+    final presensiChannelId = 'presensi_subscription_$userId';
+    final presensiChannel = _client.channel(presensiChannelId);
+
+    presensiChannel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'presensi',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            debugPrint("Realtime Update Presensi: ${payload.eventType}");
+            Future.delayed(const Duration(milliseconds: 500), refresh);
+          },
+        )
+        .subscribe();
+
+    refresh(); // First fetch
+
+    controller.onCancel = () {
+      _client.removeChannel(channel);
+      _client.removeChannel(presensiChannel);
+      controller.close();
+    };
+
+    return controller.stream;
   }
 
   /// Fetch QR Code untuk user (one-time, bukan stream)

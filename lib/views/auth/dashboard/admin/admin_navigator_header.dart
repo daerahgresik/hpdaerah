@@ -154,9 +154,9 @@ class _AdminNavigatorHeaderState extends State<AdminNavigatorHeader> {
         isTablet ? 24 : 16,
         12,
       ),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFF1A5F2D), const Color(0xFF2E7D42)],
+          colors: [Color(0xFF1A5F2D), Color(0xFF2E7D42)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

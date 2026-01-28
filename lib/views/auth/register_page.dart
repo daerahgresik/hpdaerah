@@ -185,6 +185,7 @@ class _RegisterPageState extends State<RegisterPage> {
       initialDate: _selectedTanggalLahir ?? DateTime(2000),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
+      initialDatePickerMode: DatePickerMode.year,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

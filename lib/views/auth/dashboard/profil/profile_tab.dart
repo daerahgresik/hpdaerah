@@ -366,6 +366,7 @@ class _ProfileTabState extends State<ProfileTab> {
                             initialDate: selectedBirthDate ?? DateTime(2000),
                             firstDate: DateTime(1900),
                             lastDate: DateTime.now(),
+                            initialDatePickerMode: DatePickerMode.year,
                           );
                           if (picked != null) {
                             setModalState(() => selectedBirthDate = picked);
@@ -660,9 +661,9 @@ class _ProfileTabState extends State<ProfileTab> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: const Text(
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
                       'Profil Saya',
                       style: TextStyle(
                         color: Colors.white,
@@ -765,8 +766,8 @@ class _ProfileTabState extends State<ProfileTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: const [
+                        const Row(
+                          children: [
                             Icon(Icons.feed_outlined, color: primaryGreen),
                             SizedBox(width: 8),
                             Text(

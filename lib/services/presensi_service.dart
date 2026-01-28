@@ -299,10 +299,15 @@ class PresensiService {
         .from('presensi')
         .stream(primaryKey: ['id'])
         .eq('pengajian_id', pengajianId)
+        .map((data) => data as List<dynamic>)
         .asyncMap((data) async {
           // 2. Every time presensi changes, re-fetch and re-join with targets
           // This is the most reliable way to get a consistent joined view in realtime
           return await getDetailedAttendanceList(pengajianId);
+        })
+        .handleError((error) {
+          debugPrint('Stream Detailed Attendance Error: $error');
+          return <Map<String, dynamic>>[];
         });
   }
 
@@ -408,13 +413,15 @@ class PresensiService {
         .stream(primaryKey: ['id'])
         .eq('pengajian_id', pengajianId)
         .order('created_at', ascending: false)
-        .map(
-          (data) => (data as List)
-              .map(
-                (json) =>
-                    Presensi.fromJson(Map<String, dynamic>.from(json as Map)),
-              )
-              .toList(),
-        );
+        .map((data) {
+          final List<dynamic> rawList = data as List<dynamic>;
+          return rawList.map((json) {
+            return Presensi.fromJson(Map<String, dynamic>.from(json as Map));
+          }).toList();
+        })
+        .handleError((error) {
+          debugPrint('Stream Attendance List Error: $error');
+          return <Presensi>[];
+        });
   }
 }

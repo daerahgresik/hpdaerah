@@ -58,7 +58,7 @@ class DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       extendBody: true, // Makes bottomNavigationBar float over content
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: _pages[_selectedIndex],
       bottomNavigationBar: _buildGlassBottomNav(),
     );
   }

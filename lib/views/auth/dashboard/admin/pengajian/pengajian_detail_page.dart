@@ -334,7 +334,7 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
                   const SizedBox(height: 8),
                   _buildInfoRow(
                     Icons.calendar_today,
-                    "${item.startedAt.day}/${item.startedAt.month}/${item.startedAt.year} • ${item.startedAt.hour}:${item.startedAt.minute.toString().padLeft(2, '0')}",
+                    "${item.startedAt.toLocal().day}/${item.startedAt.toLocal().month}/${item.startedAt.toLocal().year} • ${item.startedAt.toLocal().hour}:${item.startedAt.toLocal().minute.toString().padLeft(2, '0')}",
                   ),
                   const SizedBox(height: 8),
                   _buildInfoRow(
@@ -346,6 +346,38 @@ class _PengajianDetailPageState extends State<PengajianDetailPage> {
               ),
             ),
             const SizedBox(height: 24),
+
+            if ((item.materiGuru != null && item.materiGuru!.isNotEmpty) ||
+                (item.materiIsi != null && item.materiIsi!.isNotEmpty)) ...[
+              const Text(
+                "Materi / Nasehat",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (item.materiGuru != null && item.materiGuru!.isNotEmpty)
+                _buildInfoRow(
+                  Icons.person,
+                  "Guru: ${item.materiGuru!.join(', ')}",
+                  iconColor: Colors.teal,
+                ),
+              if (item.materiIsi != null && item.materiIsi!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      item.materiIsi!,
+                      style: TextStyle(color: Colors.grey[800], height: 1.5),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 24),
+            ],
 
             const Text(
               "Deskripsi",

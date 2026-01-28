@@ -742,8 +742,8 @@ class _SmartRekapTabState extends State<_SmartRekapTab> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [const Color(0xFF1A5F2D), const Color(0xFF2E7D42)],
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A5F2D), Color(0xFF2E7D42)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

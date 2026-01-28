@@ -1,488 +1,299 @@
-﻿import 'dart:math';
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/user_model.dart';
-
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
 
 class PengajianService {
   final SupabaseClient _client = Supabase.instance.client;
   final _qrService = PengajianQrService();
 
-  /// Check if there's an overlapping room at the same org level
-  Future<Map<String, dynamic>?> checkOverlappingRoom({
-    required String orgId,
-    required DateTime startedAt,
-    required DateTime endedAt,
-  }) async {
-    try {
-      final response = await _client
-          .from('pengajian')
-          .select('id, title, started_at, ended_at')
-          .eq('org_id', orgId)
-          .eq('is_template', false);
+  /// Stream Active Pengajian filtered by Org
+  /// Fixes TypeError by ensuring safe casting of realtime data
+  Stream<List<Pengajian>> streamActivePengajian(UserModel user, String orgId) {
+    if (orgId.isEmpty) return Stream.value([]);
 
-      final List<dynamic> rooms = response as List<dynamic>;
+    late StreamController<List<Pengajian>> controller;
+    RealtimeChannel? channel;
+    List<Pengajian>? latestData; // Cache for instant display
 
-      for (final room in rooms) {
-        final roomStartedAtStr = room['started_at'] as String?;
-        if (roomStartedAtStr == null) continue;
+    Future<void> fetch() async {
+      try {
+        if (controller.isClosed) return;
 
-        final roomStartedAt = DateTime.parse(roomStartedAtStr);
+        // 1. Get Ancestor IDs to allow visibility of Parent Events (e.g. Admin Desa sees Daerah events)
+        final ancestorIds = await _getAncestors(orgId);
+        final validIds = [orgId, ...ancestorIds];
 
-        // Asumsi durasi default 3 jam jika ended_at null di database
-        final roomEndedAt = room['ended_at'] != null
-            ? DateTime.parse(room['ended_at'])
-            : roomStartedAt.add(const Duration(hours: 3));
+        // debugPrint("Fetching active pengajian for org: $orgId");
 
-        // Skip jika room sudah berakhir di masa lalu
-        if (roomEndedAt.isBefore(DateTime.now())) continue;
+        final response = await _client
+            .from('pengajian')
+            .select()
+            .filter(
+              'org_id',
+              'in',
+              validIds,
+            ) // Filter by current AND parent orgs
+            .order('started_at', ascending: false);
 
-        // Strict Overlap Logic:
-        // Cek apakah rentang waktu bertabrakan
-        final bool overlaps =
-            startedAt.isBefore(roomEndedAt) && endedAt.isAfter(roomStartedAt);
+        final data = response as List<dynamic>;
+        // debugPrint("Fetched raw count: ${data.length}");
 
-        if (overlaps) {
-          // Siapkan pesan tunggu
-          String waitMessage =
-              "hingga ${roomEndedAt.hour}:${roomEndedAt.minute}";
-          return {
-            'title': room['title'] ?? 'Room Lain',
-            'ended_at': roomEndedAt,
-            'wait_message': waitMessage,
-          };
+        final List<Pengajian> items = [];
+        for (final item in data) {
+          try {
+            final map = Map<String, dynamic>.from(item as Map);
+            // Default to false if is_template is null/missing
+            final isTemplate = map['is_template'] == true;
+
+            if (!isTemplate) {
+              items.add(Pengajian.fromJson(map));
+            }
+          } catch (e) {
+            debugPrint("Error parsing pengajian item: $e");
+          }
         }
+
+        latestData = items; // Update cache
+        if (!controller.isClosed) controller.add(items);
+      } catch (e) {
+        debugPrint("Error fetching active pengajian: $e");
+        if (!controller.isClosed) controller.add([]);
       }
-      return null;
-    } catch (e) {
-      debugPrint("Error checking overlap: $e");
-      return null;
     }
+
+    controller = StreamController<List<Pengajian>>.broadcast(
+      onListen: () {
+        if (latestData != null) {
+          controller.add(latestData!); // Instant emit
+        }
+        fetch(); // Fetch fresh data
+
+        channel = _client.channel('public:pengajian:org_scope:$orgId');
+        channel
+            ?.onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'pengajian',
+              // Remove strict EQ filter to allow updates from parent orgs to trigger new fetch
+              // We rely on fetch() logic to filter what we actually care about
+              callback: (_) => fetch(),
+            )
+            .subscribe();
+      },
+      onCancel: () {
+        channel?.unsubscribe();
+        channel = null;
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
+  /// Stream Templates (Pengajian with is_template = true)
+  Stream<List<Pengajian>> streamTemplates(String orgId) {
+    return _client
+        .from('pengajian')
+        .stream(primaryKey: ['id'])
+        .eq('org_id', orgId)
+        .order('template_name', ascending: true)
+        .map((data) {
+          final List<dynamic> rawList = data;
+          return rawList
+              .map((e) {
+                final map = Map<String, dynamic>.from(e as Map);
+                return Pengajian.fromJson(map);
+              })
+              .where((p) => p.isTemplate == true)
+              .toList();
+        })
+        .handleError((error) {
+          debugPrint('Stream Templates Error: $error');
+          return <Pengajian>[];
+        });
+  }
+
+  /// Create New Pengajian Room
   Future<void> createPengajian(Pengajian pengajian) async {
     try {
-      // 0. Strict Overlap Check
-      // Walaupun endedAt null (default durasi), kita tetap validasi
-      final validationEndedAt =
-          pengajian.endedAt ??
-          pengajian.startedAt.add(const Duration(hours: 3));
-
-      final overlap = await checkOverlappingRoom(
-        orgId: pengajian.orgId,
-        startedAt: pengajian.startedAt,
-        endedAt: validationEndedAt,
-      );
-
-      if (overlap != null) {
-        throw Exception(
-          "GAGAL: Room '${overlap['title']}' sedang aktif di jam yang sama.\n"
-          "Anda tidak bisa membuat room ganda di tingkat/organisasi ini sampai room tersebut selesai (${overlap['wait_message']}).",
-        );
+      // 1. Prepare Data
+      final data = pengajian.toJson();
+      // Remove ID to let DB generate it (if empty)
+      if (pengajian.id.isEmpty) {
+        data.remove('id');
       }
 
-      // 1. Generate Room Code if empty
-      String roomCode = pengajian.roomCode ?? '';
-      if (roomCode.isEmpty) {
-        roomCode = List.generate(6, (_) => Random().nextInt(10)).join();
-      }
+      // Ensure key fields
+      data['is_template'] = false;
 
-      final data = {
-        'org_id': pengajian.orgId,
-        'title': pengajian.title,
-        'location': pengajian.location,
-        'description': pengajian.description,
-        'target_audience': pengajian.targetAudience,
-        'room_code': roomCode,
-        'started_at': pengajian.startedAt.toIso8601String(),
-        'ended_at': pengajian.endedAt?.toIso8601String(),
-        'created_by': _client.auth.currentUser?.id,
-        'is_template': false,
-        'org_daerah_id': pengajian.orgDaerahId,
-        'org_desa_id': pengajian.orgDesaId,
-        'org_kelompok_id': pengajian.orgKelompokId,
-      };
-
-      if (pengajian.id.isNotEmpty) {
-        data['id'] = pengajian.id;
-      }
-
+      // 2. Insert and Get ID returns List<Map>
       final response = await _client
           .from('pengajian')
           .insert(data)
-          .select()
-          .single();
+          .select('id, org_id, target_audience, target_kriteria_id')
+          .single(); // Use single() to get one Map
 
-      final newPengajianId = response['id'] as String;
-      debugPrint("Created Room with Code: $roomCode");
+      final newId = response['id'] as String;
+      final orgId = response['org_id'] as String;
 
-      // 2. Determine target organization based on level
-      // If room level is Daerah (0), use orgDaerahId, etc.
-      // This ensures "tingkat daerah maka targetnya di sesuaikan" requirement is met.
-      String effectiveTargetOrgId = pengajian.orgId;
-      if (pengajian.level == 0 && pengajian.orgDaerahId != null) {
-        effectiveTargetOrgId = pengajian.orgDaerahId!;
-      } else if (pengajian.level == 1 && pengajian.orgDesaId != null) {
-        effectiveTargetOrgId = pengajian.orgDesaId!;
-      } else if (pengajian.level == 2 && pengajian.orgKelompokId != null) {
-        effectiveTargetOrgId = pengajian.orgKelompokId!;
-      }
+      debugPrint('Created Room with Code: ${pengajian.roomCode}');
 
-      final creatorId = _client.auth.currentUser?.id;
-
+      // 3. Generate QR Codes automatically
+      // We run this in background so UI doesn't hang, but we await if critical
       await _qrService.generateQrForTargetUsers(
-        pengajianId: newPengajianId,
-        targetOrgId: effectiveTargetOrgId,
-        targetAudience: pengajian.targetAudience,
-        creatorId: creatorId,
+        pengajianId: newId,
+        targetOrgId: orgId,
+        targetAudience: response['target_audience'],
+        targetKriteriaId: response['target_kriteria_id'],
+        creatorId: _client.auth.currentUser?.id,
       );
     } catch (e) {
-      debugPrint("Error Create Pengajian: $e");
+      debugPrint('Error creating pengajian: $e');
       rethrow;
     }
   }
 
+  /// Create Template
+  Future<void> createTemplate(Pengajian template) async {
+    try {
+      final data = template.toJson();
+      if (template.id.isEmpty) data.remove('id');
+      data['is_template'] = true;
+
+      await _client.from('pengajian').insert(data);
+    } catch (e) {
+      debugPrint('Error creating template: $e');
+      rethrow;
+    }
+  }
+
+  /// Update Template
+  Future<void> updateTemplate(Pengajian template) async {
+    try {
+      final data = template.toJson();
+      data['is_template'] = true;
+
+      await _client.from('pengajian').update(data).eq('id', template.id);
+    } catch (e) {
+      debugPrint('Error update template: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete Template
+  Future<void> deleteTemplate(String id) async {
+    try {
+      await _client.from('pengajian').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('Error deleting template: $e');
+      rethrow;
+    }
+  }
+
+  /// Finish/Close Room
+  Future<void> closePengajian(String id) async {
+    try {
+      await _client
+          .from('pengajian')
+          .update({
+            'ended_at': DateTime.now().toIso8601String(),
+            // 'is_active': false, // If there's an is_active column, update it.
+          })
+          .eq('id', id);
+    } catch (e) {
+      debugPrint("Error closing pengajian: $e");
+      rethrow;
+    }
+  }
+
+  /// Delete Room Permanently
+  Future<void> deletePengajian(String id) async {
+    try {
+      // 1. Delete QRs
+      await _client.from('pengajian_qr').delete().eq('pengajian_id', id);
+      // 2. Delete Presensi
+      await _client.from('presensi').delete().eq('pengajian_id', id);
+      // 3. Delete Pengajian
+      await _client.from('pengajian').delete().eq('id', id);
+    } catch (e) {
+      debugPrint("Error delete pengajian: $e");
+      rethrow;
+    }
+  }
+
+  /// Find by Code (For Joining)
   Future<Pengajian?> findPengajianByCode(String code) async {
     try {
       final response = await _client
           .from('pengajian')
           .select()
           .eq('room_code', code)
+          .eq('is_template', false)
           .maybeSingle();
 
       if (response == null) return null;
-
-      // Handle type safety for Web
-      final data = Map<String, dynamic>.from(response as Map);
-      final pengajian = Pengajian.fromJson(data);
-
-      // Check if room is active
-      // 1. Must not be a template
-      if (pengajian.isTemplate) return null;
-
-      // 2. Must not be ended in the past
-      if (pengajian.endedAt != null) {
-        if (pengajian.endedAt!.isBefore(DateTime.now())) {
-          return null;
-        }
-      }
-
-      return pengajian;
+      return Pengajian.fromJson(Map<String, dynamic>.from(response));
     } catch (e) {
       debugPrint("Error findPengajianByCode: $e");
       return null;
     }
   }
 
+  /// Join Existing Room (Sync QRs for my Org's members)
   Future<void> joinPengajian({
     required String pengajianId,
     required String targetOrgId,
-    String? targetAudience,
+    required String targetAudience,
   }) async {
     try {
-      final creatorId = _client.auth.currentUser?.id;
-      // Create QR records for members of this new joining org
+      // We reuse QR Service to generate QRs for users in 'targetOrgId'
+      // to the existing 'pengajianId' with 'targetAudience' criteria.
+
+      // Note: This assumes the logic in QrService handles duplicates.
       await _qrService.generateQrForTargetUsers(
         pengajianId: pengajianId,
         targetOrgId: targetOrgId,
         targetAudience: targetAudience,
-        creatorId: creatorId,
+        creatorId: _client.auth.currentUser?.id,
       );
     } catch (e) {
+      debugPrint("Error joining pengajian: $e");
       rethrow;
     }
   }
 
-  // CREATE TEMPLATE
-  Future<void> createTemplate(Pengajian template) async {
-    try {
-      if (template.orgId.isEmpty) {
-        throw Exception("Org ID is empty");
+  Future<List<String>> _getAncestors(String orgId) async {
+    final ancestors = <String>[];
+    String? currentId = orgId;
+
+    // Safety limit to prevent infinite loops (though hierarchy depth is usually small)
+    int depth = 0;
+    while (currentId != null && depth < 5) {
+      try {
+        final res = await _client
+            .from('organizations')
+            .select('parent_id')
+            .eq('id', currentId)
+            .maybeSingle();
+
+        if (res == null) break;
+
+        final parentId = res['parent_id'] as String?;
+        if (parentId != null) {
+          ancestors.add(parentId);
+          currentId = parentId;
+        } else {
+          break;
+        }
+        depth++;
+      } catch (e) {
+        debugPrint("Error fetching ancestor: $e");
+        break;
       }
-      final data = {
-        'org_id': template.orgId,
-        'title': template.title, // Judul Default
-        'description': template.description, // Deskripsi Default
-        'location': template.location, // Lokasi Default
-        'target_audience': template.targetAudience, // FIX: Save Target Audience
-        'is_template': true,
-        'template_name': template.templateName,
-        'level': template.level, // 0, 1, 2
-        'created_by': _client.auth.currentUser?.id,
-        'started_at': DateTime.now()
-            .toIso8601String(), // Dummy date required by NOT NULL? Check schema.
-        // schema: started_at default now(). OK.
-      };
-
-      await _client.from('pengajian').insert(data);
-      debugPrint("Success Create Template: ${template.templateName}");
-    } catch (e) {
-      debugPrint("Error Create Template: $e");
-      rethrow;
     }
-  }
-
-  // UPDATE TEMPLATE
-  Future<void> updateTemplate(Pengajian template) async {
-    try {
-      if (template.id.isEmpty) {
-        throw Exception("Template ID is required for update");
-      }
-
-      final data = {
-        'title': template.title,
-        'description': template.description,
-        'location': template.location,
-        'target_audience': template.targetAudience,
-        'template_name': template.templateName,
-      };
-
-      await _client.from('pengajian').update(data).eq('id', template.id);
-      debugPrint("Success Update Template: ${template.templateName}");
-    } catch (e) {
-      debugPrint("Error Update Template: $e");
-      rethrow;
-    }
-  }
-
-  // CLOSE ROOM (Tutup Pengajian - Selesai)
-  // Tidak menghapus data, tapi menandai selesai & absen Alpha
-  Future<void> closePengajian(String id) async {
-    try {
-      // 1. Ambil semua user yang belum presensi/izin di pengajian ini
-      final unusedQRs = await _client
-          .from('pengajian_qr')
-          .select('user_id')
-          .eq('pengajian_id', id)
-          .eq('is_used', false);
-
-      final List<dynamic> usersToMark = unusedQRs;
-
-      // 2. Insert record 'tidak_hadir' ke tabel presensi untuk mereka
-      if (usersToMark.isNotEmpty) {
-        final absenceRecords = usersToMark
-            .map(
-              (q) => {
-                'pengajian_id': id,
-                'user_id': q['user_id'],
-                'status': 'tidak_hadir',
-                'method': 'auto',
-              },
-            )
-            .toList();
-
-        await _client.from('presensi').insert(absenceRecords);
-
-        // 3. Tandai semua QR as used agar hilang dari tab 'Aktif' user
-        await _client
-            .from('pengajian_qr')
-            .update({'is_used': true})
-            .eq('pengajian_id', id)
-            .eq('is_used', false);
-      }
-
-      // 4. Update pengajian set ended_at to NOW
-      await _client
-          .from('pengajian')
-          .update({'ended_at': DateTime.now().toIso8601String()})
-          .eq('id', id);
-
-      debugPrint('Pengajian $id closed (Finished)');
-    } catch (e) {
-      debugPrint("Error close pengajian: $e");
-      rethrow;
-    }
-  }
-
-  // HARD DELETE (Hapus Permanen)
-  Future<void> deletePengajian(String id) async {
-    try {
-      // HARD DELETE PROPER
-      // 1. Hapus data presensi terkait
-      await _client.from('presensi').delete().eq('pengajian_id', id);
-
-      // 2. Hapus data QR terkait
-      await _client.from('pengajian_qr').delete().eq('pengajian_id', id);
-
-      // 3. Hapus Room Pengajian
-      await _client.from('pengajian').delete().eq('id', id);
-
-      debugPrint("Success Hard Delete Pengajian: $id");
-    } catch (e) {
-      debugPrint("Error Hard Delete: $e");
-      rethrow;
-    }
-  }
-
-  Future<void> deleteTemplate(String id) async {
-    try {
-      // Templates should be hard-deleted to keep the database and UI clean
-      await _client.from('pengajian').delete().eq('id', id);
-      debugPrint("Success Delete Template: $id");
-    } catch (e) {
-      debugPrint("Error Delete Template: $e");
-      rethrow;
-    }
-  }
-
-  // GET TEMPLATES
-  Stream<List<Pengajian>> streamTemplates(String orgId) {
-    return _client.from('pengajian').stream(primaryKey: ['id']).map((data) {
-      // Explicit cast for Web/JS interop safety
-      final typedData = (data as List)
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-
-      final templates = typedData
-          .where(
-            (json) =>
-                json['org_id'] == orgId &&
-                json['is_template'] == true &&
-                json['ended_at'] == null,
-          )
-          .map((json) => Pengajian.fromJson(json))
-          .toList();
-
-      // Sort client-side
-      templates.sort(
-        (a, b) => (a.templateName ?? '').compareTo(b.templateName ?? ''),
-      );
-
-      return templates;
-    });
-  }
-
-  // Fetch Active Pengajian
-  // Criteria:
-  // 1. Same Territory (Hierarchy Aware)
-  // 2. Not a template
-  // 3. Status Active: ended_at is NULL
-  Stream<List<Pengajian>> streamActivePengajian(
-    UserModel admin,
-    String selectedOrgId,
-  ) {
-    // Optimization: Filter server-side to reduce data load and hit limit
-    // Also order by started_at DESCENDING to get the LATEST rooms first (avoid 100 limit on old data)
-    return _client
-        .from('pengajian')
-        .stream(primaryKey: ['id'])
-        .eq('is_template', false)
-        .order('started_at', ascending: false) // Fetch NEWEST first
-        .limit(50) // Limit to 50 active rooms to prevent overload
-        .map((data) {
-          try {
-            final list = List.from(data as Iterable);
-            final typedData = list
-                .map((e) {
-                  try {
-                    return Map<String, dynamic>.from(e as Map);
-                  } catch (e) {
-                    debugPrint("Error parsing pengajian row: $e");
-                    return null;
-                  }
-                })
-                .whereType<Map<String, dynamic>>()
-                .toList();
-
-            final currentUserId = _client.auth.currentUser?.id;
-
-            final filtered = typedData
-                .where((json) {
-                  // 1. Status Check: SHOW IF ACTIVE (no ended_at) OR STARTED TODAY
-                  final startedAtStr = json['started_at'] as String?;
-                  final endedAtStr = json['ended_at'] as String?;
-                  if (startedAtStr == null) return false;
-
-                  try {
-                    final startedAt = DateTime.parse(startedAtStr).toLocal();
-                    final now = DateTime.now();
-
-                    // Check if it is the same day as today
-                    final isToday =
-                        startedAt.year == now.year &&
-                        startedAt.month == now.month &&
-                        startedAt.day == now.day;
-
-                    final isActive = endedAtStr == null;
-
-                    // Show if it's still active OR it started today (even if finished)
-                    if (!isActive && !isToday) return false;
-                  } catch (e) {
-                    debugPrint(
-                      "Error parsing date in streamActivePengajian: $e",
-                    );
-                    return false;
-                  }
-
-                  // 2. Hierarchical & Permission Visibility
-                  final jsonOrgId = json['org_id'];
-                  final createdBy = json['created_by'];
-                  final jsonDaerahId = json['org_daerah_id'];
-                  final jsonDesaId = json['org_desa_id'];
-                  final jsonKelompokId = json['org_kelompok_id'];
-
-                  // Rule A: Super Admin sees everything
-                  if (admin.adminLevel == 0) return true;
-
-                  // Rule B: Creator always sees their own (Priority)
-                  if (currentUserId != null && createdBy == currentUserId) {
-                    return true;
-                  }
-
-                  // Rule C: Territory Match
-                  final myOrgId = admin.adminOrgId;
-                  if (myOrgId != null) {
-                    // Admin Daerah specific: Show room if org_daerah_id matches my org
-                    if (admin.adminLevel == 1 &&
-                        (jsonOrgId == myOrgId || jsonDaerahId == myOrgId)) {
-                      return true;
-                    }
-                    if (admin.adminLevel == 2 &&
-                        (jsonOrgId == myOrgId || jsonDesaId == myOrgId)) {
-                      return true;
-                    }
-                    if (admin.adminLevel == 3 &&
-                        (jsonOrgId == myOrgId || jsonKelompokId == myOrgId)) {
-                      return true;
-                    }
-                  }
-
-                  // Rule D: Filter by Selected Org (If user selected specific filter)
-                  if (selectedOrgId.isNotEmpty && selectedOrgId != myOrgId) {
-                    if (jsonOrgId == selectedOrgId ||
-                        jsonDaerahId == selectedOrgId ||
-                        jsonDesaId == selectedOrgId ||
-                        jsonKelompokId == selectedOrgId) {
-                      return true;
-                    }
-                  } else if (selectedOrgId.isNotEmpty &&
-                      selectedOrgId == myOrgId) {
-                    return true;
-                  }
-
-                  return false;
-                })
-                .map((json) {
-                  try {
-                    return Pengajian.fromJson(json);
-                  } catch (e) {
-                    debugPrint("Error in Pengajian.fromJson: $e");
-                    return null;
-                  }
-                })
-                .whereType<Pengajian>()
-                .toList();
-
-            // Sort Client Side: ASCENDING for display (Soonest first)
-            filtered.sort((a, b) => a.startedAt.compareTo(b.startedAt));
-
-            return filtered;
-          } catch (e) {
-            debugPrint("Critical error in streamActivePengajian mapper: $e");
-            return <Pengajian>[];
-          }
-        });
+    return ancestors;
   }
 }
