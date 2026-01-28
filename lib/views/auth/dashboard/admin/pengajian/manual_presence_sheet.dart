@@ -447,7 +447,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    initialValue: selectedReason,
+                    value: selectedReason,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.grey[50],

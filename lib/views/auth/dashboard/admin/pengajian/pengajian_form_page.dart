@@ -206,7 +206,7 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
               const SizedBox(height: 8),
               // Target Peserta
               DropdownButtonFormField<String>(
-                initialValue: _selectedTarget,
+                value: _selectedTarget,
                 items: ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit']
                     .map(
                       (label) =>

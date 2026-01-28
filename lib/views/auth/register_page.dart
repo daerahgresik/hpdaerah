@@ -733,7 +733,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // Status (WAJIB) - Warga Asli / Perantau
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedStatus,
+                                      value: _selectedStatus,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -845,7 +845,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                       // Keperluan (MT/Kuliah/Bekerja)
                                       DropdownButtonFormField<String>(
-                                        initialValue: _selectedKeperluan,
+                                        value: _selectedKeperluan,
                                         dropdownColor: const Color(0xFF1A5F2D),
                                         style: const TextStyle(
                                           color: Colors.white,
@@ -910,7 +910,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // STATUS (Kawin / Belum Kawin)
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedMarriageStatus,
+                                      value: _selectedMarriageStatus,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -944,7 +944,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // JENIS KELAMIN
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedJenisKelamin,
+                                      value: _selectedJenisKelamin,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -1003,7 +1003,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 1. Daerah (Level 0)
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedDaerah,
+                                      value: _selectedDaerah,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -1042,7 +1042,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 2. Desa (Level 1)
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedDesa,
+                                      value: _selectedDesa,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -1089,7 +1089,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 3. Kelompok (Level 2)
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedKelompok,
+                                      value: _selectedKelompok,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -1134,7 +1134,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                                     // 4. Kelas / Kategori (Level 3)
                                     DropdownButtonFormField<String>(
-                                      initialValue: _selectedKelas,
+                                      value: _selectedKelas,
                                       dropdownColor: const Color(0xFF1A5F2D),
                                       style: const TextStyle(
                                         color: Colors.white,

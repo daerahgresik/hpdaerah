@@ -1257,7 +1257,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
 
                     // JENIS KELAMIN
                     DropdownButtonFormField<String>(
-                      initialValue: jenisKelamin,
+                      value: jenisKelamin,
                       decoration: const InputDecoration(
                         labelText: 'Jenis Kelamin',
                       ),
@@ -1271,7 +1271,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
 
                     // STATUS NIKAH
                     DropdownButtonFormField<String>(
-                      initialValue: statusNikah,
+                      value: statusNikah,
                       decoration: const InputDecoration(
                         labelText: 'Status Pernikahan',
                       ),
@@ -1312,7 +1312,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     // --- STATUS WARGA ---
                     _buildSectionHeader('Status & Keperluan'),
                     DropdownButtonFormField<String>(
-                      initialValue: statusWarga,
+                      value: statusWarga,
                       decoration: const InputDecoration(labelText: 'Asal'),
                       items: ['Warga Asli', 'Perantau'].map((s) {
                         return DropdownMenuItem(value: s, child: Text(s));
@@ -1331,7 +1331,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        initialValue: keperluan,
+                        value: keperluan,
                         decoration: const InputDecoration(
                           labelText: 'Keperluan',
                         ),
@@ -1355,7 +1355,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     _buildSectionHeader('Penempatan Organisasi'),
                     // DAERAH
                     DropdownButtonFormField<String>(
-                      initialValue: selDaerahId,
+                      value: selDaerahId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Daerah'),
                       items: listDaerah.map((o) {
@@ -1376,7 +1376,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     const SizedBox(height: 12),
                     // DESA
                     DropdownButtonFormField<String>(
-                      initialValue: selDesaId,
+                      value: selDesaId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Desa'),
                       items: listDesa.map((o) {
@@ -1396,7 +1396,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     const SizedBox(height: 12),
                     // KELOMPOK
                     DropdownButtonFormField<String>(
-                      initialValue: selKelompokId,
+                      value: selKelompokId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Kelompok'),
                       items: listKelompok.map((o) {
@@ -1415,7 +1415,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
                     const SizedBox(height: 12),
                     // KATEGORI
                     DropdownButtonFormField<String>(
-                      initialValue: selKategoriId,
+                      value: selKategoriId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Kategori'),
                       items: listKategori.map((o) {
