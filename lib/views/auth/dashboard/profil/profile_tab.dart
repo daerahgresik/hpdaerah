@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
-import 'package:hpdaerah/views/auth/login_page.dart';
+import 'package:hpdaerah/views/landing_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
@@ -623,11 +624,19 @@ class _ProfileTabState extends State<ProfileTab> {
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-              );
+            onPressed: () async {
+              // 1. Clear session
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('logged_in_username');
+
+              if (context.mounted) {
+                Navigator.pop(context); // Close dialog
+                // 2. Back to Halaman Depan and clear stack
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const HalamanDepan()),
+                  (route) => false,
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Keluar', style: TextStyle(color: Colors.white)),

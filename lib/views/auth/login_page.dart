@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hpdaerah/services/auth_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
 import 'package:hpdaerah/views/auth/register_page.dart';
+import 'package:hpdaerah/views/landing_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -190,7 +191,18 @@ class _LoginPageState extends State<LoginPage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HalamanDepan(),
+                            ),
+                          );
+                        }
+                      },
                       icon: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
