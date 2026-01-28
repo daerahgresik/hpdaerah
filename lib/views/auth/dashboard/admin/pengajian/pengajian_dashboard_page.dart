@@ -63,18 +63,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     _updateActiveStream();
   }
 
-  @override
-  void didUpdateWidget(PengajianDashboardPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.orgId != oldWidget.orgId) {
-      // Reset selection if parent org changes (rare case but safer)
-      if (widget.user.adminLevel != 0) {
-        _selectedOrgId = widget.orgId;
-      }
-      _updateActiveStream();
-    }
-  }
-
   void _updateActiveStream() {
     final targetOrgId = _selectedOrgId ?? widget.orgId;
     if (_lastStreamOrgId == targetOrgId) return;
@@ -427,8 +415,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const SizedBox(height: 24),
               Row(
                 children: [
-                  const Expanded(
-                    child: Text(
+                  Expanded(
+                    child: const Text(
                       "Pilih Template / Tingkat",
                       style: TextStyle(
                         fontSize: 16,
@@ -1120,23 +1108,13 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                                         CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // LEVEL INDICATOR (TEXT ONLY)
-                                      Text(
-                                        "Level: ${_getLevelName(item.level ?? 2)}",
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
                                       Text(
                                         item.title,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 15,
-                                          color: Colors.black87,
                                         ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 4),
                                       Builder(
@@ -1231,7 +1209,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  "${item.startedAt.toLocal().hour.toString().padLeft(2, '0')}:${item.startedAt.toLocal().minute.toString().padLeft(2, '0')} - ${item.endedAt != null ? "${item.endedAt!.toLocal().hour.toString().padLeft(2, '0')}:${item.endedAt!.toLocal().minute.toString().padLeft(2, '0')}" : 'Selesai'}",
+                                  "${item.startedAt.hour.toString().padLeft(2, '0')}:${item.startedAt.minute.toString().padLeft(2, '0')} - ${item.endedAt != null ? "${item.endedAt!.hour.toString().padLeft(2, '0')}:${item.endedAt!.minute.toString().padLeft(2, '0')}" : 'Selesai'}",
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 12,
@@ -1255,31 +1233,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                                       style: TextStyle(
                                         color: Colors.grey[600],
                                         fontSize: 12,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                            if (item.materiGuru != null &&
-                                item.materiGuru!.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.person_outline,
-                                    size: 14,
-                                    color: Colors.grey,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      "Guru: ${item.materiGuru!.join(', ')}",
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 11,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1416,18 +1369,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     );
   }
 
-  String _getLevelName(int level) {
-    switch (level) {
-      case 0:
-        return "DAERAH";
-      case 1:
-        return "DESA";
-      case 2:
-      default:
-        return "KELOMPOK";
-    }
-  }
-
   // CLOSE (Selesai Normal)
   Future<void> _confirmCloseRoom(BuildContext context, Pengajian item) async {
     final confirm = await showDialog<bool>(
@@ -1504,9 +1445,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
           _updateActiveStream(); // Refresh UI
         }
       } catch (e) {
-        if (context.mounted) {
+        if (context.mounted)
           _showStatusSnackBar("Gagal menghapus: $e", isError: true);
-        }
       }
     }
   }
@@ -1586,8 +1526,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
+          Row(
+            children: const [
               Icon(
                 Icons.location_city_rounded,
                 color: Color(0xFF1A5F2D),
@@ -1630,7 +1570,6 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               onChanged: (val) {
                 setState(() {
                   _selectedOrgId = val;
-                  _updateActiveStream(); // Ensure stream updates when org changes
                 });
               },
             ),
@@ -1825,11 +1764,11 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.search, color: Colors.blueAccent, size: 18),
-              SizedBox(width: 8),
-              Text(
+              const Icon(Icons.search, color: Colors.blueAccent, size: 18),
+              const SizedBox(width: 8),
+              const Text(
                 "Cari & Join Pengajian Bersama",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
