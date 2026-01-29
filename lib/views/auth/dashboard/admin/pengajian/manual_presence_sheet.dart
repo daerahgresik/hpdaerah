@@ -18,6 +18,15 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = "";
   bool _isProcessing = false;
+  late Stream<List<Map<String, dynamic>>> _attendanceStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _attendanceStream = _presensiService.streamDetailedAttendance(
+      widget.pengajian.id,
+    );
+  }
 
   @override
   void dispose() {
@@ -117,9 +126,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
             child: Stack(
               children: [
                 StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: _presensiService.streamDetailedAttendance(
-                    widget.pengajian.id,
-                  ),
+                  stream: _attendanceStream,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(

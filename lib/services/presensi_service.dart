@@ -294,15 +294,12 @@ class PresensiService {
   Stream<List<Map<String, dynamic>>> streamDetailedAttendance(
     String pengajianId,
   ) {
-    // 1. Monitor the 'presensi' table for changes in this pengajian
+    // Listen to ANY change in presensi for this pengajian to trigger a refresh
     return _client
         .from('presensi')
         .stream(primaryKey: ['id'])
         .eq('pengajian_id', pengajianId)
-        .map((data) => data as List<dynamic>)
-        .asyncMap((data) async {
-          // 2. Every time presensi changes, re-fetch and re-join with targets
-          // This is the most reliable way to get a consistent joined view in realtime
+        .asyncMap((_) async {
           return await getDetailedAttendanceList(pengajianId);
         })
         .handleError((error) {
@@ -315,64 +312,70 @@ class PresensiService {
     String pengajianId,
   ) async {
     try {
-      // 1. Get all QRs (targets) joined with users
-      final response = await _client
+      // 1. Get QR targets
+      final qrResponse = await _client
           .from('pengajian_qr')
-          .select('''
-            is_used,
-            user:users (
-              id, nama, username, foto_profil, status_warga, asal,
-              org_daerah_id, org_desa_id, org_kelompok_id,
-              org_daerah:organizations!org_daerah_id(name),
-              org_desa:organizations!org_desa_id(name),
-              org_kelompok:organizations!org_kelompok_id(name)
-            )
-          ''')
+          .select('user_id, is_used')
           .eq('pengajian_id', pengajianId);
+      final List<dynamic> qrRaw = qrResponse;
 
-      final List<dynamic> data = response;
-
-      // 2. Get all presence records for this pengajian to get actual status
+      // 2. Get Presence records
       final presensiResponse = await _client
           .from('presensi')
-          .select()
+          .select('user_id, status, method, keterangan, foto_izin, created_at')
           .eq('pengajian_id', pengajianId);
+      final List<dynamic> presensiRaw = presensiResponse;
 
-      final List<dynamic> presensiList = presensiResponse;
+      // 3. Collect unique User IDs
+      final userIds = <String>{};
+      for (var q in qrRaw) {
+        if (q['user_id'] != null) userIds.add(q['user_id'] as String);
+      }
+      for (var p in presensiRaw) {
+        if (p['user_id'] != null) userIds.add(p['user_id'] as String);
+      }
 
-      return data.map((item) {
-        final user = item['user'] as Map<String, dynamic>;
-        final userId = user['id'];
+      if (userIds.isEmpty) return [];
 
-        // Find presence record
-        final actualPresensi = presensiList.firstWhere(
-          (p) => p['user_id'] == userId,
-          orElse: () => <String, dynamic>{},
+      // 4. Batch fetch User details with organization names
+      final userResponse = await _client
+          .from('users')
+          .select('''
+            id, nama, username, foto_profil,
+            org_daerah:organizations!org_daerah_id(name),
+            org_desa:organizations!org_desa_id(name),
+            org_kelompok:organizations!org_kelompok_id(name)
+          ''')
+          .filter('id', 'in', userIds.toList());
+      final List<dynamic> usersData = userResponse;
+      final userMap = {for (var u in usersData) u['id'] as String: u};
+
+      // 5. Merge into consolidated list
+      return userIds.map((uid) {
+        final userData = userMap[uid] ?? {};
+        final qrData = qrRaw.firstWhere(
+          (q) => q['user_id'] == uid,
+          orElse: () => {},
+        );
+        final pData = presensiRaw.firstWhere(
+          (p) => p['user_id'] == uid,
+          orElse: () => {},
         );
 
-        final status = actualPresensi.isEmpty
-            ? 'belum_absen'
-            : (actualPresensi['status'] ?? 'belum_absen');
-
         return {
-          'user_id': userId,
-          'nama': user['nama'] ?? 'Tanpa Nama',
-          'username': user['username'],
-          'foto_profil': user['foto_profil'],
-          'status_warga': user['status_warga'],
-          'asal': user['asal'],
-          'daerah_id': user['org_daerah_id'],
-          'desa_id': user['org_desa_id'],
-          'kelompok_id': user['org_kelompok_id'],
-          'daerah': user['org_daerah']?['name'],
-          'desa': user['org_desa']?['name'],
-          'kelompok': user['org_kelompok']?['name'],
-          'is_used': item['is_used'],
-          'status': status,
-          'method': actualPresensi['method'],
-          'keterangan': actualPresensi['keterangan'],
-          'foto_izin': actualPresensi['foto_izin'],
-          'recorded_at': actualPresensi['created_at'],
+          'user_id': uid,
+          'nama': userData['nama'] ?? 'Jamaah',
+          'username': userData['username'],
+          'foto_profil': userData['foto_profil'],
+          'daerah': userData['org_daerah']?['name'],
+          'desa': userData['org_desa']?['name'],
+          'kelompok': userData['org_kelompok']?['name'],
+          'is_used': qrData['is_used'] ?? false,
+          'status': pData['status'] ?? 'belum_absen',
+          'method': pData['method'],
+          'keterangan': pData['keterangan'],
+          'foto_izin': pData['foto_izin'],
+          'recorded_at': pData['created_at'],
         };
       }).toList();
     } catch (e) {
