@@ -239,16 +239,16 @@ class HomeTab extends StatelessWidget {
             child: const Icon(Icons.check_circle, color: Color(0xFF1A5F2D)),
           ),
           const SizedBox(width: 16),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Status Kehadiran",
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: 4),
+                Text(
                   "Akses Mudah & Cepat",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,

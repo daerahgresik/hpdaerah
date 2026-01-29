@@ -490,8 +490,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const SizedBox(height: 24),
               Row(
                 children: [
-                  Expanded(
-                    child: const Text(
+                  const Expanded(
+                    child: Text(
                       "Pilih Template / Tingkat",
                       style: TextStyle(
                         fontSize: 16,
@@ -1466,8 +1466,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
           _updateActiveStream(); // Refresh UI
         }
       } catch (e) {
-        if (context.mounted)
+        if (context.mounted) {
           _showStatusSnackBar("Gagal menghapus: $e", isError: true);
+        }
       }
     }
   }
@@ -1547,8 +1548,8 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(
                 Icons.location_city_rounded,
                 color: Color(0xFF1A5F2D),
@@ -1785,11 +1786,11 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.search, color: Colors.blueAccent, size: 18),
-              const SizedBox(width: 8),
-              const Text(
+              Icon(Icons.search, color: Colors.blueAccent, size: 18),
+              SizedBox(width: 8),
+              Text(
                 "Cari & Join Pengajian Bersama",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -1979,7 +1980,7 @@ class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
       label = "AKAN DATANG ($countdown LAGI)";
       color = Colors.orange;
     } else {
-      final diff = end != null ? end.difference(now) : null;
+      final diff = end?.difference(now);
       if (diff != null && diff.inSeconds > 0) {
         String remaining;
         if (diff.inHours > 0) {
