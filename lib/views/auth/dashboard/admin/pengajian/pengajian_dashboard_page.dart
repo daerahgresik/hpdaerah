@@ -298,14 +298,14 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
           status: 'tolak',
         );
 
-        // Bakar QR agar tidak bisa discan ulang (harus generate/refreshed)
+        // Jika pakai QR Dinamis, bakar yang lama dan OTOMATIS BERIKAN YANG BARU
         if (validQr != null) {
-          await _qrService.markQrAsUsed(validQr.id);
+          await _qrService.regenerateQrForUser(validQr.pengajianId, user.id!);
         }
 
         if (mounted) {
           _showStatusSnackBar(
-            "Verifikasi ditolak untuk ${user.nama}",
+            "Verifikasi ditolak. Barcode baru telah dikirim ke ${user.nama}.",
             isError: true,
           );
         }

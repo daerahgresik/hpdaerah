@@ -130,6 +130,8 @@ class _QrCodeTabState extends State<QrCodeTab> {
     Color statusColor = Colors.grey;
     IconData statusIcon = Icons.timer;
 
+    bool isRetry = qr.presensiStatus == 'tolak' && !qr.isUsed;
+
     if (qr.presensiStatus == 'izin') {
       statusText = "Anda Izin";
       statusColor = Colors.orange;
@@ -138,6 +140,10 @@ class _QrCodeTabState extends State<QrCodeTab> {
       statusText = "Sudah Hadir";
       statusColor = const Color(0xFF1A5F2D);
       statusIcon = Icons.check_circle;
+    } else if (isRetry) {
+      statusText = "Barcode Ulang";
+      statusColor = Colors.red;
+      statusIcon = Icons.refresh_rounded;
     } else if (qr.presensiStatus == 'tolak') {
       statusText = "Ditolak / Gagal";
       statusColor = Colors.red;
@@ -380,6 +386,21 @@ class _QrCodeTabState extends State<QrCodeTab> {
               subtitle:
                   "Selamat mengikuti pengajian dengan khidmat. Semoga bertambah barokah dan manfaat.",
             )
+          else if (isRetry)
+            // SPECIAL RETRY STATE: Show NEW QR with "Ini Barcode Ulangmu"
+            Column(
+              children: [
+                _buildStatusCard(
+                  icon: Icons.info_outline_rounded,
+                  color: Colors.red,
+                  title: "INI BARCODE ULANG-MU",
+                  subtitle:
+                      "Admin belum memvalidasi identitasmu tadi. Mungkin foto profilmu kurang jelas? Tenang, ini barcode baru untukmu, silakan coba scan lagi ya.",
+                ),
+                _buildQrImageSection(qr),
+                const SizedBox(height: 12),
+              ],
+            )
           else if (qr.presensiStatus == 'tolak')
             _buildStatusCard(
               icon: Icons.gpp_maybe_rounded,
@@ -391,26 +412,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
             )
           else ...[
             // NORMAL QR STATE
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 10),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade100),
-              ),
-              child: SizedBox(
-                width: 130,
-                height: 130,
-                child: QrImageView(
-                  data: qr.qrCode,
-                  version: QrVersions.auto,
-                  size: 130,
-                  backgroundColor: Colors.white,
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-            ),
+            _buildQrImageSection(qr),
             // Lapor Izin Button - Ultra Slim
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
@@ -435,6 +437,31 @@ class _QrCodeTabState extends State<QrCodeTab> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildQrImageSection(PengajianQr qr) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Center(
+        child: SizedBox(
+          width: 130,
+          height: 130,
+          child: QrImageView(
+            data: qr.qrCode,
+            version: QrVersions.auto,
+            size: 130,
+            backgroundColor: Colors.white,
+            padding: EdgeInsets.zero,
+          ),
+        ),
       ),
     );
   }
