@@ -537,15 +537,9 @@ class PengajianQrService {
         'is_used': false,
       });
 
-      // 3. Delete 'tolak' presence record to clear status
-      await _client
-          .from('presensi')
-          .delete()
-          .eq('pengajian_id', pengajianId)
-          .eq('user_id', userId)
-          .eq('status', 'tolak');
-
-      debugPrint('QR regenerated for user: $userId');
+      debugPrint(
+        'QR regenerated for user: $userId (tolak record kept for state)',
+      );
     } catch (e) {
       debugPrint('Error regenerating QR: $e');
       rethrow;

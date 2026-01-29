@@ -273,7 +273,7 @@ class PengajianService {
             )
             .toList();
 
-        await _client.from('presensi').insert(absenceRecords);
+        await _client.from('presensi').upsert(absenceRecords);
 
         // 3. Tandai semua QR as used agar hilang dari tab 'Aktif' user
         await _client

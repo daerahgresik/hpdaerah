@@ -135,6 +135,9 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                     final hadir = allData
                         .where((e) => e['status'] == 'hadir')
                         .length;
+                    final tolak = allData
+                        .where((e) => e['status'] == 'tolak')
+                        .length;
                     final total = allData.length;
 
                     final filteredData = allData.where((item) {
@@ -184,13 +187,28 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                                   ),
                                 ),
                                 const Spacer(),
-                                Text(
-                                  "$hadir / $total Hadir",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1A5F2D),
-                                    fontSize: 15,
-                                  ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      "$hadir / $total Hadir",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1A5F2D),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    if (tolak > 0)
+                                      Text(
+                                        "$tolak Verifikasi Gagal",
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -247,6 +265,9 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
     } else if (status == 'tidak_hadir') {
       statusColor = Colors.red;
       statusLabel = "Alpha";
+    } else if (status == 'tolak') {
+      statusColor = Colors.redAccent;
+      statusLabel = "Ditolak";
     }
 
     bool isHadir = status == 'hadir';
@@ -269,6 +290,8 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
               ? const Color(0xFF1A5F2D).withValues(alpha: 0.2)
               : isIzin
               ? Colors.amber.withValues(alpha: 0.2)
+              : status == 'tolak'
+              ? Colors.red.withValues(alpha: 0.2)
               : Colors.grey.shade100,
           width: 1.5,
         ),
