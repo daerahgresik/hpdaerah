@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
@@ -1191,63 +1192,9 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 4),
-                                      Builder(
-                                        builder: (context) {
-                                          final now = DateTime.now();
-                                          final start = item.startedAt
-                                              .toLocal();
-                                          final end = item.endedAt?.toLocal();
-
-                                          String label;
-                                          Color color;
-
-                                          if (end != null && now.isAfter(end)) {
-                                            label = "SELESAI";
-                                            color = Colors.grey;
-                                          } else if (now.isBefore(start)) {
-                                            final diff = start.difference(now);
-                                            final prefix = diff.inHours > 0
-                                                ? "${diff.inHours} JAM"
-                                                : "${diff.inMinutes + 1} MENIT";
-                                            label =
-                                                "AKAN DATANG ($prefix LAGI)";
-                                            color = Colors.orange;
-                                          } else {
-                                            final diff = end != null
-                                                ? end.difference(now).inMinutes
-                                                : 0;
-                                            label =
-                                                "SEDANG BERLANGSUNG${diff > 0 ? ' • SISA ${diff}m' : ''}";
-                                            color = const Color(0xFF1A5F2D);
-                                          }
-
-                                          return Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: color.withValues(
-                                                alpha: 0.1,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: color.withValues(
-                                                  alpha: 0.3,
-                                                ),
-                                              ),
-                                            ),
-                                            child: Text(
-                                              label,
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: color,
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                      _LiveCountdownBadge(
+                                        startedAt: item.startedAt,
+                                        endedAt: item.endedAt,
                                       ),
                                     ],
                                   ),
@@ -1969,6 +1916,101 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _LiveCountdownBadge extends StatefulWidget {
+  final DateTime startedAt;
+  final DateTime? endedAt;
+
+  const _LiveCountdownBadge({required this.startedAt, this.endedAt});
+
+  @override
+  State<_LiveCountdownBadge> createState() => _LiveCountdownBadgeState();
+}
+
+class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final start = widget.startedAt.toLocal();
+    final end = widget.endedAt?.toLocal();
+
+    String label;
+    Color color;
+
+    if (end != null && now.isAfter(end)) {
+      label = "SELESAI";
+      color = Colors.grey;
+      _timer?.cancel();
+    } else if (now.isBefore(start)) {
+      final diff = start.difference(now);
+      String countdown;
+      if (diff.inHours > 0) {
+        countdown =
+            "${diff.inHours}j ${(diff.inMinutes % 60)}m ${(diff.inSeconds % 60)}s";
+      } else if (diff.inMinutes > 0) {
+        countdown = "${diff.inMinutes}m ${(diff.inSeconds % 60)}s";
+      } else {
+        countdown = "${diff.inSeconds}s";
+      }
+      label = "AKAN DATANG ($countdown LAGI)";
+      color = Colors.orange;
+    } else {
+      final diff = end != null ? end.difference(now) : null;
+      if (diff != null && diff.inSeconds > 0) {
+        String remaining;
+        if (diff.inHours > 0) {
+          remaining =
+              "${diff.inHours}j ${(diff.inMinutes % 60)}m ${(diff.inSeconds % 60)}s";
+        } else if (diff.inMinutes > 0) {
+          remaining = "${diff.inMinutes}m ${(diff.inSeconds % 60)}s";
+        } else {
+          remaining = "${diff.inSeconds}s";
+        }
+        label = "SEDANG BERLANGSUNG • SISA $remaining";
+      } else {
+        label = "SEDANG BERLANGSUNG";
+      }
+      color = const Color(0xFF1A5F2D);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
       ),
     );
   }
