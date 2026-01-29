@@ -306,8 +306,6 @@ class PengajianQrService {
 
           if (pData != null) {
             final endedAtStr = pData['ended_at'] as String?;
-            final isUsed = qrData['is_used'] as bool? ?? false;
-
             bool isActive = true;
             if (endedAtStr != null) {
               final endedAt = DateTime.parse(endedAtStr).toLocal();
@@ -318,7 +316,7 @@ class PengajianQrService {
               }
             }
 
-            if (isActive && !isUsed) {
+            if (isActive) {
               final enrichedData = {
                 ...qrData,
                 'pengajian': pData,
@@ -517,6 +515,40 @@ class PengajianQrService {
     } catch (e) {
       debugPrint('Error processing QR scan: $e');
       return {'success': false, 'message': 'Terjadi kesalahan: $e'};
+    }
+  }
+
+  /// Regenerate QR code if it was previously rejected or used incorrectly
+  Future<void> regenerateQrForUser(String pengajianId, String userId) async {
+    try {
+      // 1. Delete old QR
+      await _client
+          .from('pengajian_qr')
+          .delete()
+          .eq('pengajian_id', pengajianId)
+          .eq('user_id', userId);
+
+      // 2. Generate new
+      final qrCode = _generateUniqueQrCode(pengajianId, userId);
+      await _client.from('pengajian_qr').insert({
+        'pengajian_id': pengajianId,
+        'user_id': userId,
+        'qr_code': qrCode,
+        'is_used': false,
+      });
+
+      // 3. Delete 'tolak' presence record to clear status
+      await _client
+          .from('presensi')
+          .delete()
+          .eq('pengajian_id', pengajianId)
+          .eq('user_id', userId)
+          .eq('status', 'tolak');
+
+      debugPrint('QR regenerated for user: $userId');
+    } catch (e) {
+      debugPrint('Error regenerating QR: $e');
+      rethrow;
     }
   }
 

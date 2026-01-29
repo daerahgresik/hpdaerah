@@ -275,7 +275,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       );
 
       if (confirmed == true) {
-        // Catat Presensi
+        // Catat Presensi: Hadir
         await _presensiService.recordPresence(
           pengajianId: validQr?.pengajianId ?? pengajian.id,
           userId: user.id!,
@@ -283,12 +283,32 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
           status: 'hadir',
         );
 
-        // Jika pakai QR Dinamis, tandai sbg terpakai
+        // Jika pakai QR Dinamis, tandai sbg terpakai/terbakar
         if (validQr != null) {
           await _qrService.markQrAsUsed(validQr.id);
         }
 
         if (mounted) _showStatusSnackBar("Berhasil: ${user.nama} telah hadir");
+      } else if (confirmed == false) {
+        // Catat Presensi: Ditolak (Verifikasi Gagal)
+        await _presensiService.recordPresence(
+          pengajianId: validQr?.pengajianId ?? pengajian.id,
+          userId: user.id!,
+          method: 'qr',
+          status: 'tolak',
+        );
+
+        // Bakar QR agar tidak bisa discan ulang (harus generate/refreshed)
+        if (validQr != null) {
+          await _qrService.markQrAsUsed(validQr.id);
+        }
+
+        if (mounted) {
+          _showStatusSnackBar(
+            "Verifikasi ditolak untuk ${user.nama}",
+            isError: true,
+          );
+        }
       }
     } catch (e) {
       if (mounted) _showStatusSnackBar("Gagal: $e", isError: true);

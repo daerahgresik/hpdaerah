@@ -85,10 +85,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
           }
 
           final allQr = snapshot.data ?? [];
-          // Categorize QR codes - ONLY SHOW ACTIVE
-          final aktif = allQr.where((q) => !q.isUsed).toList();
-
-          return _buildAktifTab(aktif);
+          return _buildAktifTab(allQr);
         },
       ),
     );
@@ -137,6 +134,14 @@ class _QrCodeTabState extends State<QrCodeTab> {
       statusText = "Anda Izin";
       statusColor = Colors.orange;
       statusIcon = Icons.assignment_late;
+    } else if (qr.presensiStatus == 'hadir') {
+      statusText = "Sudah Hadir";
+      statusColor = const Color(0xFF1A5F2D);
+      statusIcon = Icons.check_circle;
+    } else if (qr.presensiStatus == 'tolak') {
+      statusText = "Ditolak / Gagal";
+      statusColor = Colors.red;
+      statusIcon = Icons.error_outline;
     } else if (startTime != null) {
       if (now.isBefore(startTime)) {
         final diff = startTime.difference(now);
@@ -335,21 +340,33 @@ class _QrCodeTabState extends State<QrCodeTab> {
             ),
           ),
 
-          // QR Code or Izin Status - Micro
+          // State Based Bottom Section
           if (qr.presensiStatus == 'izin')
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                children: [
-                  Icon(Icons.check_circle, size: 32, color: Colors.green[600]),
-                  const Text(
-                    "Anda Sudah Izin",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
+            _buildStatusCard(
+              icon: Icons.assignment_turned_in_rounded,
+              color: Colors.orange,
+              title: "Anda Sudah Izin",
+              subtitle: "Laporan izin Anda telah diterima oleh admin.",
+            )
+          else if (qr.presensiStatus == 'hadir')
+            _buildStatusCard(
+              icon: Icons.celebration_rounded,
+              color: const Color(0xFF1A5F2D),
+              title: "Anda Telah Hadir!",
+              subtitle:
+                  "Selamat mengikuti pengajian dengan khidmat. Semoga bertambah barokah dan manfaat.",
+            )
+          else if (qr.presensiStatus == 'tolak')
+            _buildStatusCard(
+              icon: Icons.gpp_maybe_rounded,
+              color: Colors.red,
+              title: "Verifikasi Gagal",
+              subtitle:
+                  "Mohon maaf, identitas Anda belum tervalidasi. Pastikan menggunakan akun pribadi dan foto profil sesuai. Silakan hubungi admin di lokasi jika ini adalah kesalahan.",
+              action: _buildRetryButton(qr),
             )
           else ...[
+            // NORMAL QR STATE
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),
               padding: const EdgeInsets.all(8),
@@ -394,6 +411,119 @@ class _QrCodeTabState extends State<QrCodeTab> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    Widget? action,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 11,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (action != null) ...[const SizedBox(height: 12), action],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRetryButton(PengajianQr qr) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _isProcessing
+            ? null
+            : () async {
+                setState(() => _isProcessing = true);
+                try {
+                  await _qrService.regenerateQrForUser(
+                    qr.pengajianId,
+                    widget.user.id!,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Barcode berhasil diperbarui!"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Gagal memperbarui: $e"),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() => _isProcessing = false);
+                  }
+                }
+              },
+        icon: const Icon(Icons.refresh_rounded, size: 18),
+        label: const Text(
+          "BARCODE ULANG",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
       ),
     );
   }
