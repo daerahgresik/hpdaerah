@@ -6,11 +6,13 @@ import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_selector.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_detail_page.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayatpengajian.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/khataman/khataman_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/manual_presence_sheet.dart';
+import 'package:hpdaerah/models/pengajian_qr_model.dart';
+import 'package:hpdaerah/services/pengajian_qr_service.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/barcode_scanner_page.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -29,6 +31,7 @@ class PengajianDashboardPage extends StatefulWidget {
 class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   final _pengajianService = PengajianService();
   final _presensiService = PresensiService();
+  final _qrService = PengajianQrService();
   bool _showCreateRoom = false;
   bool _showActiveRoom = false;
   bool _showHistoryRoom = false; // New Menu State
@@ -138,19 +141,62 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
     }
   }
 
-  Future<void> _handleScanResult(Pengajian pengajian, String username) async {
+  Future<void> _handleScanResult(
+    Pengajian pengajian,
+    String scannedValue,
+  ) async {
     try {
-      final user = await _presensiService.findUserByUsername(username);
+      UserModel? user;
+      PengajianQr? validQr;
+
+      // 1. DETEKSI JENIS QR
+      if (scannedValue.toUpperCase().startsWith("PGJ-")) {
+        // INI ADALAH QR PENGAJIAN (Dinamis)
+        validQr = await _qrService.validateQrCode(scannedValue);
+
+        if (validQr == null) {
+          if (mounted) {
+            _showStatusSnackBar(
+              "QR tidak valid atau tidak ditemukan",
+              isError: true,
+            );
+          }
+          return;
+        }
+
+        if (validQr.isUsed) {
+          if (mounted) {
+            _showStatusSnackBar("QR ini sudah pernah digunakan", isError: true);
+          }
+          return;
+        }
+
+        // Opsional: Cek apakah QR ini untuk pengajian yang sedang aktif di layar
+        if (validQr.pengajianId != pengajian.id) {
+          // Tetap diperbolehkan atas permintaan user (fleksibilitas),
+          // tapi beri peringatan atau update pengajian variabel
+          debugPrint("QR for different pengajian: ${validQr.pengajianId}");
+        }
+
+        user = await _presensiService.findUserById(validQr.userId);
+      } else {
+        // INI ADALAH QR USER (Statis - Username)
+        user = await _presensiService.findUserByUsername(scannedValue);
+      }
+
       if (user == null) {
         if (mounted) {
-          _showStatusSnackBar("User tidak ditemukan: $username", isError: true);
+          _showStatusSnackBar(
+            "User tidak ditemukan: $scannedValue",
+            isError: true,
+          );
         }
         return;
       }
 
       if (!mounted) return;
 
-      // VERIFIKASI IDENTITAS
+      // VERIFIKASI IDENTITAS (Dialog Konfirmasi)
       final bool? confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -165,7 +211,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               CircleAvatar(
                 radius: 50,
                 backgroundColor: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
-                backgroundImage: user.fotoProfil != null
+                backgroundImage: user!.fotoProfil != null
                     ? NetworkImage(user.fotoProfil!)
                     : null,
                 child: user.fotoProfil == null
@@ -186,6 +232,24 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               _buildDetailInfo('Desa', user.orgDesaName),
               _buildDetailInfo('Daerah', user.orgDaerahName),
               const SizedBox(height: 20),
+              if (validQr != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "Acara: ${validQr.pengajianTitle}",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               const Text(
                 'Apakah data di atas sesuai dengan orang di depan Anda?',
                 textAlign: TextAlign.center,
@@ -196,10 +260,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text(
-                'TOLAK (Bukan Dia)',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('TOLAK', style: TextStyle(color: Colors.red)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -214,27 +275,20 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       );
 
       if (confirmed == true) {
+        // Catat Presensi
         await _presensiService.recordPresence(
-          pengajianId: pengajian.id,
+          pengajianId: validQr?.pengajianId ?? pengajian.id,
           userId: user.id!,
           method: 'qr',
           status: 'hadir',
         );
-        if (mounted) _showStatusSnackBar("Berhasil: ${user.nama} telah hadir");
-      } else if (confirmed == false) {
-        // Mark as Rejected / Tidak Hadir
-        await _presensiService.recordPresence(
-          pengajianId: pengajian.id,
-          userId: user.id!,
-          method: 'qr',
-          status: 'tidak_hadir', // Dinyatakan tidak hadir karena penolakan
-        );
-        if (mounted) {
-          _showStatusSnackBar(
-            "Identitas ditolak. Status: Tidak Hadir.",
-            isError: true,
-          );
+
+        // Jika pakai QR Dinamis, tandai sbg terpakai
+        if (validQr != null) {
+          await _qrService.markQrAsUsed(validQr.id);
         }
+
+        if (mounted) _showStatusSnackBar("Berhasil: ${user.nama} telah hadir");
       }
     } catch (e) {
       if (mounted) _showStatusSnackBar("Gagal: $e", isError: true);
