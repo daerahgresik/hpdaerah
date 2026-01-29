@@ -166,32 +166,56 @@ class _QrCodeTabState extends State<QrCodeTab> {
       }
     }
 
+    // --- Dynamic Theming Based on Status ---
+    List<Color> headerGradient = [
+      const Color(0xFF1A5F2D),
+      const Color(0xFF2E7D42),
+    ];
+    Color cardBg = Colors.white;
+    Color? accentShadow = Colors.black.withValues(alpha: 0.04);
+
+    if (qr.presensiStatus == 'hadir') {
+      headerGradient = [const Color(0xFF1A5F2D), const Color(0xFF0D3B1C)];
+      cardBg = const Color(0xFFF1F9F3);
+      accentShadow = const Color(0xFF1A5F2D).withValues(alpha: 0.1);
+    } else if (qr.presensiStatus == 'tolak') {
+      headerGradient = [const Color(0xFFC62828), const Color(0xFF8E0000)];
+      cardBg = const Color(0xFFFFF5F5);
+      accentShadow = Colors.red.withValues(alpha: 0.1);
+    } else if (qr.presensiStatus == 'izin') {
+      headerGradient = [const Color(0xFFEF6C00), const Color(0xFFE65100)];
+      cardBg = const Color(0xFFFFF8E1);
+      accentShadow = Colors.orange.withValues(alpha: 0.1);
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: accentShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header - Micro Compact
+          // Header - Micro Compact with Dynamic Gradient
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: const BoxDecoration(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF1A5F2D), Color(0xFF2E7D42)],
+                colors: headerGradient,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
@@ -362,7 +386,7 @@ class _QrCodeTabState extends State<QrCodeTab> {
               color: Colors.red,
               title: "Verifikasi Gagal",
               subtitle:
-                  "Mohon maaf, identitas Anda belum tervalidasi. Pastikan menggunakan akun pribadi dan foto profil sesuai. Silakan hubungi admin di lokasi jika ini adalah kesalahan.",
+                  "Maaf, verifikasi identitas belum tervalidasi oleh Admin. Pastikan Anda menggunakan akun pribadi dan foto profil sudah sesuai dengan wajah asli. Silakan hubungi Admin di lokasi untuk bantuan lebih lanjut.",
               action: _buildRetryButton(qr),
             )
           else ...[
