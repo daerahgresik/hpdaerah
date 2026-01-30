@@ -371,126 +371,139 @@ class PengajianService {
     UserModel admin,
     String selectedOrgId,
   ) {
-    // Optimization: Filter server-side to reduce data load and hit limit
-    // Also order by started_at DESCENDING to get the LATEST rooms first (avoid 100 limit on old data)
-    return _client
+    // Determine the most specific filter we can apply at the DB level
+    // to avoid the 50-room limit cutting off our own rooms.
+    var query = _client
         .from('pengajian')
         .stream(primaryKey: ['id'])
-        .eq('is_template', false)
-        .order('started_at', ascending: false) // Fetch NEWEST first
-        .limit(50) // Limit to 50 active rooms to prevent overload
-        .map((data) {
-          try {
-            final list = List.from(data as Iterable);
-            final typedData = list
-                .map((e) {
-                  try {
-                    return Map<String, dynamic>.from(e as Map);
-                  } catch (e) {
-                    debugPrint("Error parsing pengajian row: $e");
-                    return null;
+        .eq('is_template', false);
+
+    return query.order('started_at', ascending: false).limit(100).map((data) {
+      try {
+        final list = List.from(data as Iterable);
+        final currentUserId = _client.auth.currentUser?.id;
+
+        // Diagnostic log
+        debugPrint(
+          "Stream Sync: Received ${list.length} rooms from DB. AdminPos: ${admin.adminLevelName}, TargetOrg: $selectedOrgId, MyID: $currentUserId",
+        );
+
+        final typedData = list
+            .map((e) {
+              try {
+                return Map<String, dynamic>.from(e as Map);
+              } catch (e) {
+                return null;
+              }
+            })
+            .whereType<Map<String, dynamic>>()
+            .toList();
+
+        final filtered = typedData
+            .where((json) {
+              final createdBy = json['created_by'];
+
+              // 1. Status Check
+              final endedAtStr = json['ended_at'] as String?;
+              final startedAtStr = json['started_at'] as String?;
+              if (startedAtStr == null) return false;
+
+              DateTime now = DateTime.now();
+
+              // Rule: Show if it hasn't ended yet
+              bool hasEnded = false;
+              if (endedAtStr != null) {
+                try {
+                  final endedAt = DateTime.parse(endedAtStr).toLocal();
+                  if (endedAt.isBefore(now)) {
+                    hasEnded = true;
                   }
-                })
-                .whereType<Map<String, dynamic>>()
-                .toList();
+                } catch (_) {}
+              }
 
-            final currentUserId = _client.auth.currentUser?.id;
+              // Also show finished rooms if they started TODAY (for recap convenience)
+              bool isToday = false;
+              try {
+                final startedAt = DateTime.parse(startedAtStr).toLocal();
+                isToday =
+                    startedAt.year == now.year &&
+                    startedAt.month == now.month &&
+                    startedAt.day == now.day;
+              } catch (_) {}
 
-            final filtered = typedData
-                .where((json) {
-                  // 1. Status Check: SHOW IF ACTIVE (no ended_at) OR STARTED TODAY
-                  final startedAtStr = json['started_at'] as String?;
-                  final endedAtStr = json['ended_at'] as String?;
-                  if (startedAtStr == null) return false;
+              // KEEP in list if:
+              // A. It hasn't ended yet (Scheduled or Running)
+              // B. OR It ended today (Convenience for admin)
+              if (hasEnded && !isToday) return false;
 
-                  try {
-                    final startedAt = DateTime.parse(startedAtStr).toLocal();
-                    final now = DateTime.now();
+              // 2. Hierarchical & Permission Visibility
+              final jsonOrgId = json['org_id'];
+              final jsonDaerahId = json['org_daerah_id'];
+              final jsonDesaId = json['org_desa_id'];
+              final jsonKelompokId = json['org_kelompok_id'];
 
-                    // Check if it is the same day as today
-                    final isToday =
-                        startedAt.year == now.year &&
-                        startedAt.month == now.month &&
-                        startedAt.day == now.day;
+              // Rule A: Super Admin (Internal level 0)
+              if (admin.adminLevel == 0) return true;
 
-                    final isActive = endedAtStr == null;
+              // Rule B: Creator always sees their own
+              if (currentUserId != null && createdBy == currentUserId) {
+                return true;
+              }
 
-                    // Show if it's still active OR it started today (even if finished)
-                    if (!isActive && !isToday) return false;
-                  } catch (e) {
-                    debugPrint(
-                      "Error parsing date in streamActivePengajian: $e",
-                    );
-                    return false;
-                  }
+              // Rule C: Territory Match (Current User's Territory)
+              final myOrgId = admin.adminOrgId;
+              if (myOrgId != null) {
+                if (admin.adminLevel == 1 &&
+                    (jsonOrgId == myOrgId || jsonDaerahId == myOrgId)) {
+                  return true;
+                }
+                if (admin.adminLevel == 2 &&
+                    (jsonOrgId == myOrgId || jsonDesaId == myOrgId)) {
+                  return true;
+                }
+                if (admin.adminLevel == 3 &&
+                    (jsonOrgId == myOrgId || jsonKelompokId == myOrgId)) {
+                  return true;
+                }
+              }
 
-                  // 2. Hierarchical & Permission Visibility
-                  final jsonOrgId = json['org_id'];
-                  final createdBy = json['created_by'];
-                  final jsonDaerahId = json['org_daerah_id'];
-                  final jsonDesaId = json['org_desa_id'];
-                  final jsonKelompokId = json['org_kelompok_id'];
+              // Rule D: Filter by Selected Org (For Super Admin or specific context)
+              if (selectedOrgId.isNotEmpty) {
+                if (jsonOrgId == selectedOrgId ||
+                    jsonDaerahId == selectedOrgId ||
+                    jsonDesaId == selectedOrgId ||
+                    jsonKelompokId == selectedOrgId) {
+                  return true;
+                }
+              }
 
-                  // Rule A: Super Admin sees everything
-                  if (admin.adminLevel == 0) return true;
+              return false;
+            })
+            .map((json) {
+              try {
+                return Pengajian.fromJson(json);
+              } catch (e) {
+                return null;
+              }
+            })
+            .whereType<Pengajian>()
+            .toList();
 
-                  // Rule B: Creator always sees their own (Priority)
-                  if (currentUserId != null && createdBy == currentUserId) {
-                    return true;
-                  }
-
-                  // Rule C: Territory Match
-                  final myOrgId = admin.adminOrgId;
-                  if (myOrgId != null) {
-                    // Admin Daerah specific: Show room if org_daerah_id matches my org
-                    if (admin.adminLevel == 1 &&
-                        (jsonOrgId == myOrgId || jsonDaerahId == myOrgId)) {
-                      return true;
-                    }
-                    if (admin.adminLevel == 2 &&
-                        (jsonOrgId == myOrgId || jsonDesaId == myOrgId)) {
-                      return true;
-                    }
-                    if (admin.adminLevel == 3 &&
-                        (jsonOrgId == myOrgId || jsonKelompokId == myOrgId)) {
-                      return true;
-                    }
-                  }
-
-                  // Rule D: Filter by Selected Org (If user selected specific filter)
-                  if (selectedOrgId.isNotEmpty && selectedOrgId != myOrgId) {
-                    if (jsonOrgId == selectedOrgId ||
-                        jsonDaerahId == selectedOrgId ||
-                        jsonDesaId == selectedOrgId ||
-                        jsonKelompokId == selectedOrgId) {
-                      return true;
-                    }
-                  } else if (selectedOrgId.isNotEmpty &&
-                      selectedOrgId == myOrgId) {
-                    return true;
-                  }
-
-                  return false;
-                })
-                .map((json) {
-                  try {
-                    return Pengajian.fromJson(json);
-                  } catch (e) {
-                    debugPrint("Error in Pengajian.fromJson: $e");
-                    return null;
-                  }
-                })
-                .whereType<Pengajian>()
-                .toList();
-
-            // Sort Client Side: ASCENDING for display (Soonest first)
-            filtered.sort((a, b) => a.startedAt.compareTo(b.startedAt));
-
-            return filtered;
-          } catch (e) {
-            debugPrint("Critical error in streamActivePengajian mapper: $e");
-            return <Pengajian>[];
-          }
+        // Sort: Active ones first, then by date
+        filtered.sort((a, b) {
+          if (a.endedAt == null && b.endedAt != null) return -1;
+          if (a.endedAt != null && b.endedAt == null) return 1;
+          return b.startedAt.compareTo(a.startedAt); // Newest first
         });
+
+        debugPrint(
+          "Stream Sync: Final filtered list has ${filtered.length} rooms",
+        );
+        return filtered;
+      } catch (e) {
+        debugPrint("Critical error in streamActivePengajian mapper: $e");
+        return <Pengajian>[];
+      }
+    });
   }
 }

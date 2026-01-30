@@ -812,26 +812,38 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                       selectedEndTime.minute,
                     );
 
-                    // Hierarchical context resolution
+                    // Hierarchical context resolution:
+                    // Priority 1: Use the user's defined hierarchy
+                    // Priority 2: If user is an admin of a certain level, use their adminOrgId
                     String targetOrgId = selectedSubOrgId ?? widget.orgId;
                     String? orgDaerahId = widget.user.orgDaerahId;
                     String? orgDesaId = widget.user.orgDesaId;
                     String? orgKelompokId = widget.user.orgKelompokId;
 
-                    // If a sub-org was selected, we need to update the hierarchy IDs
+                    // Super Admin / Cross-level support:
+                    // If we are acting as a specific level, ensure that level's ID is set
+                    if (widget.user.adminLevel == 1)
+                      orgDaerahId ??= widget.user.adminOrgId;
+                    if (widget.user.adminLevel == 2)
+                      orgDesaId ??= widget.user.adminOrgId;
+                    if (widget.user.adminLevel == 3)
+                      orgKelompokId ??= widget.user.adminOrgId;
+
+                    // If a sub-org was selected, we update the hierarchy for that specific room
                     if (selectedSubOrgId != null) {
                       final selectedOrg = subOrgs.firstWhere(
                         (o) => o.id == selectedSubOrgId,
                       );
-                      // Determine which level of ID to update
                       if (selectedOrg.type == 'daerah') {
                         orgDaerahId = selectedOrg.id;
                       } else if (selectedOrg.type == 'desa') {
                         orgDesaId = selectedOrg.id;
+                        orgDaerahId = selectedOrg.parentId; // Link to parent
                       } else if (selectedOrg.type == 'kelompok') {
                         orgKelompokId = selectedOrg.id;
-                        // If we pick a Kelompok, the parent is the Desa
                         orgDesaId = selectedOrg.parentId;
+                        // For Kelompok, the parent is Desa. We might need to find the Daerah too.
+                        // But for now, this ensures the leaf and its immediate parent are set.
                       }
                     }
 
