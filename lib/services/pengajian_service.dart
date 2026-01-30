@@ -163,6 +163,31 @@ class PengajianService {
     }
   }
 
+  Future<void> updatePengajian(Pengajian pengajian) async {
+    try {
+      if (pengajian.id.isEmpty) {
+        throw Exception("Pengajian ID is required for update");
+      }
+
+      final data = {
+        'title': pengajian.title,
+        'location': pengajian.location,
+        'description': pengajian.description,
+        'target_audience': pengajian.targetAudience,
+        'target_kriteria_id': pengajian.targetKriteriaId,
+        'room_code': pengajian.roomCode,
+        'started_at': pengajian.startedAt.toIso8601String(),
+        'ended_at': pengajian.endedAt?.toIso8601String(),
+      };
+
+      await _client.from('pengajian').update(data).eq('id', pengajian.id);
+      debugPrint("Success Update Pengajian: ${pengajian.id}");
+    } catch (e) {
+      debugPrint("Error Update Pengajian: $e");
+      rethrow;
+    }
+  }
+
   Future<Pengajian?> findPengajianByCode(String code) async {
     try {
       final response = await _client

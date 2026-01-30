@@ -3,7 +3,7 @@ import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/utils/menu_helper.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/admin_navigator_header.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/organisasi/organisasi_list_page.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/presensi/presensi_center_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/laporan/laporan_center_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_dashboard_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengguna/pengguna_list_page.dart';
 
@@ -188,8 +188,8 @@ class _AdminTabState extends State<AdminTab> {
           parentName: null,
         );
 
-      case '/admin/presensi-center':
-        return PresensiCenterPage(user: widget.user);
+      case '/admin/laporan-center':
+        return LaporanCenterPage(user: widget.user);
 
       case '/admin/pengajian/buat':
         return PengajianDashboardPage(

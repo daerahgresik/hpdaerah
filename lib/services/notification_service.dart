@@ -1,8 +1,8 @@
-﻿import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+﻿import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -18,7 +18,7 @@ class NotificationService {
 
   // Initialize
   Future<void> init() async {
-    if (_isInitialized) return;
+    if (_isInitialized || kIsWeb) return; // Skip on web for now to avoid hangs
 
     // Android Settings
     const androidSettings = AndroidInitializationSettings(

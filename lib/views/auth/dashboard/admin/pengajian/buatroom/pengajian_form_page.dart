@@ -10,6 +10,7 @@ class PengajianFormPage extends StatefulWidget {
   final String orgId;
   final String? scope; // Daerah, Desa, atau Kelompok
   final Pengajian? template; // Template data (jika dari Menu Cepat)
+  final Pengajian? existing; // Room yang sudah ada (untuk EDIT)
 
   const PengajianFormPage({
     super.key,
@@ -17,6 +18,7 @@ class PengajianFormPage extends StatefulWidget {
     required this.orgId,
     this.scope,
     this.template,
+    this.existing,
   });
 
   @override
@@ -42,19 +44,24 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill dari template jika ada
-    _namaController = TextEditingController(text: widget.template?.title ?? '');
-    _lokasiController = TextEditingController(
-      text: widget.template?.location ?? '',
-    );
+    // Pre-fill dari template atau existing jika ada
+    final source = widget.existing ?? widget.template;
+    _namaController = TextEditingController(text: source?.title ?? '');
+    _lokasiController = TextEditingController(text: source?.location ?? '');
     _deskripsiController = TextEditingController(
       text:
-          widget.template?.description ??
+          source?.description ??
           (widget.scope != null ? "Pengajian Tingkat ${widget.scope}" : ""),
     );
-    _roomCodeController = TextEditingController();
-    _selectedTarget = widget.template?.targetAudience;
-    _selectedTargetKriteriaId = widget.template?.targetKriteriaId;
+    _roomCodeController = TextEditingController(text: source?.roomCode ?? '');
+    _selectedTarget = source?.targetAudience;
+    _selectedTargetKriteriaId = source?.targetKriteriaId;
+
+    if (widget.existing != null) {
+      _selectedDate = widget.existing!.startedAt;
+      _selectedTime = TimeOfDay.fromDateTime(widget.existing!.startedAt);
+    }
+
     _loadTargets();
   }
 
@@ -128,20 +135,9 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
         _selectedTime!.minute,
       );
 
-      final newPengajian = Pengajian(
-        id: '', // ID akan digenerate di backend jika pakai V4, tapi di sini kita bisa pakai random string atau biarkan DB generate jika servicenya support.
-        // Note: Service code uses .insert with 'id': id. So we should generate ID here or handle it in service.
-        // Let's assume we need to generate UUID or let Postgres do it.
-        // Based on service code: 'id': pengajian.id
-        // Usually Supabase defaults ID if omitted, but our model requires it.
-        // Let's modify service to NOT send ID if it is empty, OR generate UUID here.
-        // For simplicity and robustness, passing empty string and letting DB handle it if configured (default gen_random_uuid()) is risky if we strictly send 'id': ''.
-        // Actually, looking at OrganizationService, it generates random string logic.
-        // But PengajianService I wrote sends 'id'.
-        // Let's rely on my previous knowledge or just generate a minimal UUID-like string or just removed 'id' from insert map in service?
-        // Use Supabase SDK standard: omit ID to let DB generate.
-        // But Model requires ID. I'll pas "new" and handle it in Service.
-        orgId: widget.orgId,
+      final finalPengajian = Pengajian(
+        id: widget.existing?.id ?? '',
+        orgId: widget.existing?.orgId ?? widget.orgId,
         title: _namaController.text,
         location: _lokasiController.text,
         description: _deskripsiController.text,
@@ -149,22 +145,32 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
         targetKriteriaId: _selectedTargetKriteriaId,
         roomCode: _roomCodeController.text.trim().toUpperCase(),
         startedAt: startedAt,
+        endedAt: widget.existing?.endedAt,
         // Full hierarchical context
-        orgDaerahId: widget.user.orgDaerahId,
-        orgDesaId: widget.user.orgDesaId,
-        orgKelompokId: widget.user.orgKelompokId,
+        orgDaerahId: widget.existing?.orgDaerahId ?? widget.user.orgDaerahId,
+        orgDesaId: widget.existing?.orgDesaId ?? widget.user.orgDesaId,
+        orgKelompokId:
+            widget.existing?.orgKelompokId ?? widget.user.orgKelompokId,
       );
 
-      await _service.createPengajian(newPengajian);
+      if (widget.existing != null) {
+        await _service.updatePengajian(finalPengajian);
+      } else {
+        await _service.createPengajian(finalPengajian);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Row(
+            content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Pengajian berhasil dibuat!'),
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Text(
+                  widget.existing != null
+                      ? 'Berhasil memperbarui data!'
+                      : 'Pengajian berhasil dibuat!',
+                ),
               ],
             ),
             backgroundColor: const Color(0xFF1A5F2D),
@@ -200,9 +206,9 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          'Buat Pengajian Baru',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          widget.existing != null ? 'Edit Pengajian' : 'Buat Pengajian Baru',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFF1A5F2D),
@@ -416,9 +422,11 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          'Buat Pengajian',
-                          style: TextStyle(
+                      : Text(
+                          widget.existing != null
+                              ? 'Simpan Perubahan'
+                              : 'Buat Pengajian',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

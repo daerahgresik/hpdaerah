@@ -96,9 +96,9 @@ class MenuHelper {
           color: Colors.green,
         ),
         MenuItem(
-          title: 'Presensi',
+          title: 'Laporan',
           icon: Icons.fact_check,
-          route: '/admin/presensi-center',
+          route: '/admin/laporan-center',
           color: Colors.indigo,
         ),
         MenuItem(

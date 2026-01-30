@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/user_model.dart';
+import 'package:hpdaerah/services/pengajian_service.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/buatroom/pengajian_form_page.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayat/rekap_pengajian_page.dart'; // Import ini
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -22,6 +24,7 @@ class _RiwayatPengajianState extends State<RiwayatPengajian> {
   late DateTime _selectedDay;
   Map<DateTime, List<Pengajian>> _events = {};
   bool _isLoading = true;
+  final _pengajianService = PengajianService();
 
   @override
   void initState() {
@@ -299,14 +302,7 @@ class _RiwayatPengajianState extends State<RiwayatPengajian> {
 
   Widget _buildEventCard(Pengajian item) {
     return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RekapPengajianPage(pengajian: item),
-          ),
-        );
-      },
+      onTap: () => _showDetailSheet(item),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -404,7 +400,388 @@ class _RiwayatPengajianState extends State<RiwayatPengajian> {
     }
   }
 
+  String _formatDateShort(DateTime dt) {
+    try {
+      return DateFormat('d MMMM yyyy', 'id_ID').format(dt);
+    } catch (_) {
+      return "${dt.day}/${dt.month}/${dt.year}";
+    }
+  }
+
   String _formatTime(DateTime dt) {
     return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+
+  void _showDetailSheet(Pengajian item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _buildDetailSheet(item),
+    );
+  }
+
+  Widget _buildDetailSheet(Pengajian item) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.mosque, color: Color(0xFF1A5F2D)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "Informasi Lengkap Room",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              if (item.roomCode != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    item.roomCode!,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+
+          // Scrollable Info Area
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildDetailRow(
+                    Icons.calendar_today,
+                    "Tanggal",
+                    _formatDateShort(item.startedAt),
+                  ),
+                  _buildDetailRow(
+                    Icons.access_time,
+                    "Waktu",
+                    "${_formatTime(item.startedAt)} - ${item.endedAt != null ? _formatTime(item.endedAt!) : 'Selesai'}",
+                  ),
+                  _buildDetailRow(
+                    Icons.location_on,
+                    "Lokasi",
+                    item.location ?? "-",
+                  ),
+                  _buildDetailRow(
+                    Icons.people,
+                    "Target",
+                    item.targetAudience ?? "Semua",
+                  ),
+                  if (item.description != null && item.description!.isNotEmpty)
+                    _buildDetailRow(
+                      Icons.description,
+                      "Keterangan",
+                      item.description!,
+                    ),
+
+                  // Materi Section
+                  if ((item.materiGuru?.isNotEmpty ?? false) ||
+                      (item.materiIsi?.isNotEmpty ?? false)) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.menu_book,
+                                size: 16,
+                                color: Colors.orange,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                "Ringkasan Materi",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          if (item.materiGuru?.isNotEmpty ?? false) ...[
+                            Text(
+                              "Guru: ${item.materiGuru!.join(', ')}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          if (item.materiIsi?.isNotEmpty ?? false)
+                            Text(
+                              item.materiIsi!,
+                              style: TextStyle(
+                                color: Colors.grey[800],
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Actions
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RekapPengajianPage(pengajian: item),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.analytics),
+              label: const Text("LIHAT REKAP KEHADIRAN"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A5F2D),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PengajianFormPage(
+                          user: widget.user,
+                          orgId: widget.orgId,
+                          existing: item,
+                        ),
+                      ),
+                    );
+                    if (result == true) {
+                      _fetchMonthlyEvents(_focusedDay); // Refresh
+                    }
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: const Text("EDIT DETAIL"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmDelete(item),
+                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                  label: const Text(
+                    "HAPUS",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Colors.grey[400]),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(Pengajian item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 12),
+            Text("Hapus Riwayat?"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Apakah Anda sangat yakin ingin menghapus riwayat pengajian ini?",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Tindakan ini PERMANEN. Seluruh data rekap kehadiran, statistik, dan ringkasan materi untuk room '${item.title}' akan hilang selamanya.",
+              style: TextStyle(color: Colors.red[700], fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("BATAL"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Close dialog
+              Navigator.pop(context); // Close sheet
+              _doDelete(item.id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("YA, HAPUS PERMANEN"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _doDelete(String id) async {
+    setState(() => _isLoading = true);
+    try {
+      await _pengajianService.deletePengajian(id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Riwayat berhasil dihapus"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _fetchMonthlyEvents(_focusedDay);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Gagal menghapus: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

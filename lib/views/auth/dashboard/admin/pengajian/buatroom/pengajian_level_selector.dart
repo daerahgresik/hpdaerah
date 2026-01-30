@@ -822,12 +822,15 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
                     // Super Admin / Cross-level support:
                     // If we are acting as a specific level, ensure that level's ID is set
-                    if (widget.user.adminLevel == 1)
+                    if (widget.user.adminLevel == 1) {
                       orgDaerahId ??= widget.user.adminOrgId;
-                    if (widget.user.adminLevel == 2)
+                    }
+                    if (widget.user.adminLevel == 2) {
                       orgDesaId ??= widget.user.adminOrgId;
-                    if (widget.user.adminLevel == 3)
+                    }
+                    if (widget.user.adminLevel == 3) {
                       orgKelompokId ??= widget.user.adminOrgId;
+                    }
 
                     // If a sub-org was selected, we update the hierarchy for that specific room
                     if (selectedSubOrgId != null) {
@@ -887,15 +890,15 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     if (context.mounted) {
                       Navigator.pop(ctx);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
+                        const SnackBar(
+                          content: Row(
                             children: [
                               Icon(Icons.check_circle, color: Colors.white),
                               SizedBox(width: 12),
                               Text('Pengajian & Materi berhasil dibuat!'),
                             ],
                           ),
-                          backgroundColor: const Color(0xFF1A5F2D),
+                          backgroundColor: Color(0xFF1A5F2D),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );

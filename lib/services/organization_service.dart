@@ -311,41 +311,56 @@ class OrganizationService {
     // Build subtitle berdasarkan path
     if (adminLevel == 1) {
       // Admin Daerah
-      title = 'Admin Daerahmu: ${currentOrg.name}';
+      final cleanName = currentOrg.name.replaceAll(
+        RegExp(r'^Daerah\s+', caseSensitive: false),
+        '',
+      );
+      title = 'Admin Daerah $cleanName';
       subtitle = '';
     } else if (adminLevel == 2 && path.length >= 2) {
       // Admin Desa
-      title = 'Admin Desamu: ${currentOrg.name}';
-      subtitle =
-          'Daerahmu ${path[0].name.replaceAll(RegExp(r'^Daerah ', caseSensitive: false), '')}';
+      final cleanName = currentOrg.name.replaceAll(
+        RegExp(r'^Desa\s+', caseSensitive: false),
+        '',
+      );
+      final cleanDaerah = path[0].name.replaceAll(
+        RegExp(r'^Daerah\s+', caseSensitive: false),
+        '',
+      );
+      title = 'Admin Desa $cleanName';
+      subtitle = 'Daerah $cleanDaerah';
     } else if (adminLevel == 3 && path.length >= 3) {
       // Admin Kelompok
-      title = 'Admin Kelompokmu: ${currentOrg.name}';
-      final desName = path[1].name.replaceAll(
-        RegExp(r'^Desa ', caseSensitive: false),
+      final cleanName = currentOrg.name.replaceAll(
+        RegExp(r'^Kelompok\s+', caseSensitive: false),
         '',
       );
-      final daeName = path[0].name.replaceAll(
-        RegExp(r'^Daerah ', caseSensitive: false),
+      final cleanDesa = path[1].name.replaceAll(
+        RegExp(r'^Desa\s+', caseSensitive: false),
         '',
       );
-      subtitle = 'Desamu $desName • Daerahmu $daeName';
+      final cleanDaerah = path[0].name.replaceAll(
+        RegExp(r'^Daerah\s+', caseSensitive: false),
+        '',
+      );
+
+      title = 'Admin Kelompok $cleanName';
+      subtitle = 'Desa $cleanDesa • Daerah $cleanDaerah';
     } else if (adminLevel == 4 && path.length >= 4) {
       // Admin Kategori
+      final cleanKelompok = path[2].name.replaceAll(
+        RegExp(r'^Kelompok\s+', caseSensitive: false),
+        '',
+      );
+      final cleanDesa = path[1].name.replaceAll(
+        RegExp(r'^Desa\s+', caseSensitive: false),
+        '',
+      );
+
       title = 'Admin ${currentOrg.name}';
-      final kelName = path[2].name.replaceAll(
-        RegExp(r'^Kelompok ', caseSensitive: false),
-        '',
-      );
-      final desName = path[1].name.replaceAll(
-        RegExp(r'^Desa ', caseSensitive: false),
-        '',
-      );
-      final daeName = path[0].name.replaceAll(
-        RegExp(r'^Daerah ', caseSensitive: false),
-        '',
-      );
-      subtitle = 'Kelompokmu $kelName • Desamu $desName • Daerahmu $daeName';
+      subtitle = 'Kelompok $cleanKelompok • Desa $cleanDesa';
+    } else {
+      title = 'Admin ${currentOrg.name}';
     }
 
     return {

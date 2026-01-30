@@ -14,6 +14,7 @@ import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/manual_p
 import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/barcode_scanner_page.dart';
+import 'package:hpdaerah/services/target_kriteria_service.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -33,6 +34,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   final _pengajianService = PengajianService();
   final _presensiService = PresensiService();
   final _qrService = PengajianQrService();
+  final _targetService = TargetKriteriaService();
   bool _showCreateRoom = false;
   bool _showActiveRoom = false;
   bool _showHistoryRoom = false; // New Menu State
@@ -1615,15 +1617,42 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       return;
     }
 
-    // Show confirmation dialog with target audience selector
-    final options = ['Semua', 'Muda - mudi', 'Praremaja', 'Caberawit'];
+    // Fetch real targets for the organization
+    List<String> options = ['Semua'];
+    bool isLoadingTargets = true;
+    _targetService
+        .fetchAvailableTargets(
+          orgId: orgId,
+          orgDaerahId: widget.user.orgDaerahId,
+          orgDesaId: widget.user.orgDesaId,
+          orgKelompokId: widget.user.orgKelompokId,
+        )
+        .then((targets) {
+          options = ['Semua', ...targets.map((t) => t.namaTarget)];
+          isLoadingTargets = false;
+        })
+        .catchError((e) {
+          isLoadingTargets = false;
+        });
+
     String selectedTarget = _foundPengajian!.targetAudience ?? 'Semua';
-    if (!options.contains(selectedTarget)) selectedTarget = 'Semua';
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) {
+          // Trigger a periodic check until targets are loaded (or use FutureBuilder inside dialog)
+          if (isLoadingTargets) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (ctx.mounted) setStateDialog(() {});
+            });
+          }
+
+          String levelName = 'Unknown';
+          if (_foundPengajian!.level == 0) levelName = 'DAERAH';
+          if (_foundPengajian!.level == 1) levelName = 'DESA';
+          if (_foundPengajian!.level == 2) levelName = 'KELOMPOK';
+
           return AlertDialog(
             title: const Text("Konfirmasi Gabung Room"),
             content: Column(
@@ -1652,20 +1681,60 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                 ),
                 const SizedBox(height: 12),
                 Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.blue.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _foundPengajian!.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              levelName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _foundPengajian!.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       if (_foundPengajian!.location != null)
-                        Text("📍 ${_foundPengajian!.location}"),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            "📍 ${_foundPengajian!.location}",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1678,22 +1747,27 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedTarget,
-                  items: options
-                      .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                      .toList(),
-                  onChanged: (val) =>
-                      setStateDialog(() => selectedTarget = val ?? 'Semua'),
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                if (isLoadingTargets)
+                  const Center(child: LinearProgressIndicator())
+                else
+                  DropdownButtonFormField<String>(
+                    value: options.contains(selectedTarget)
+                        ? selectedTarget
+                        : 'Semua',
+                    items: options
+                        .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setStateDialog(() => selectedTarget = val ?? 'Semua'),
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.grey[50],
                     ),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.grey[50],
                   ),
-                ),
                 const SizedBox(height: 16),
                 Text(
                   "* QR Code akan dikirim ke anggota baru yang belum terdaftar di room ini.",
@@ -1846,12 +1920,42 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _foundPengajian!.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                  Row(
+                    children: [
+                      if (_foundPengajian!.level != null)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _foundPengajian!.level == 0
+                                ? "DAERAH"
+                                : _foundPengajian!.level == 1
+                                ? "DESA"
+                                : "KELOMPOK",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          _foundPengajian!.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(

@@ -27,27 +27,14 @@ class OrganisasiListPage extends StatelessWidget {
         : orgService.streamChildren(parentId!);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA), // Modern minimalist background
-      appBar: AppBar(
-        title: const Text(
-          'Manajemen Organisasi',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF1A5F2D),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      backgroundColor: const Color(0xFFF5F7FA),
+      // AppBar dihapus karena sudah ada navigasi di atas
       floatingActionButton: level == 0
-          ? FloatingActionButton.extended(
+          ? FloatingActionButton(
               onPressed: () => _showAddDialog(context, null, 0),
               backgroundColor: const Color(0xFF1A5F2D),
               elevation: 4,
-              icon: const Icon(Icons.add, weight: 600),
-              label: const Text(
-                'Tambah Daerah',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
       body: StreamBuilder<List<Organization>>(
@@ -67,27 +54,62 @@ class OrganisasiListPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.folder_off_outlined,
-                    size: 60,
-                    color: Colors.grey[300],
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.folder_off_outlined,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Text(
-                    "Belum ada data",
-                    style: TextStyle(color: Colors.grey[500]),
+                    "Belum ada data organisasi",
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Silakan tambah data baru",
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
                   ),
                 ],
               ),
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            itemCount: list.length,
-            itemBuilder: (context, index) {
-              return ModernOrgTreeItem(org: list[index]);
-            },
+          return CustomScrollView(
+            slivers: [
+              const SliverPadding(
+                padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 16, left: 4),
+                    child: Text(
+                      "Struktur Organisasi",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => ModernOrgTreeItem(org: list[index]),
+                  childCount: list.length,
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -190,22 +212,34 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    // Icon Box
+                    // Icon Box with Gradient
                     Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: _levelColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        gradient: LinearGradient(
+                          colors: [
+                            _levelColor.withValues(alpha: 0.15),
+                            _levelColor.withValues(alpha: 0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _levelColor.withValues(alpha: 0.1),
+                          width: 1,
+                        ),
                       ),
                       child: Icon(
                         isLeaf
                             ? Icons.person_outline
                             : (_isExpanded ? Icons.folder_open : Icons.folder),
                         color: _levelColor,
+                        size: 22,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     // Texts
                     Expanded(
                       child: Column(
@@ -236,7 +270,8 @@ class _ModernOrgTreeItemState extends State<ModernOrgTreeItem>
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
+                                    color: Colors.grey[800],
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                               ),

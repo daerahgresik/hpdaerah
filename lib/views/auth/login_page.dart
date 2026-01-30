@@ -31,35 +31,50 @@ class _LoginPageState extends State<LoginPage> {
   void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
+      debugPrint("Starting login for: ${_usernameController.text.trim()}");
 
       try {
-        // 1. Try 'users' table
-        var response = await Supabase.instance.client
-            .from('users')
-            .select()
-            .eq('username', _usernameController.text.trim())
-            .eq('password', _passwordController.text)
-            .maybeSingle();
+        final authService = AuthService();
 
-        // 2. If valid user not found, try 'super_admins'
-        response ??= await Supabase.instance.client
-            .from('super_admins')
-            .select()
-            .eq('username', _usernameController.text.trim())
-            .eq('password', _passwordController.text)
-            .maybeSingle();
+        // Use a single call to AuthService that handles the logic
+        // and add a timeout to prevent infinite spinning
+        final user = await authService
+            .getCurrentUser(_usernameController.text.trim())
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw Exception(
+                "Koneksi ke server lambat. Silakan coba lagi.",
+              ),
+            );
 
-        if (mounted) setState(() => _isLoading = false);
+        if (!mounted) return;
+        setState(() => _isLoading = false);
 
-        if (response != null) {
+        if (user != null) {
+          // Check password manually since getCurrentUser only fetches by username
+          // NOTE: In a real app, this should be done in one secure step.
+          // For now, we fetch the raw data to verify password.
+
+          final userData = await Supabase.instance.client
+              .from(user.adminLevel == 0 ? 'super_admins' : 'users')
+              .select('password')
+              .eq('username', user.username)
+              .maybeSingle();
+
+          if (userData == null ||
+              userData['password'] != _passwordController.text) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Username atau Password salah'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            return;
+          }
+
           // Login Success
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-            'logged_in_username',
-            _usernameController.text.trim(),
-          );
-
-          if (!mounted) return;
+          await prefs.setString('logged_in_username', user.username);
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -72,48 +87,30 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
 
-          // Fetch User Profile
-          final authService = AuthService();
-          final user = await authService.getCurrentUser(
-            _usernameController.text.trim(),
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => DashboardPage(user: user)),
           );
-
-          if (mounted) {
-            if (user != null) {
-              // Navigate to Unified Dashboard
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DashboardPage(user: user),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Gagal memuat profil user')),
-              );
-            }
-          }
         } else {
-          // Login Failed
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Username atau Password salah'),
-                backgroundColor: Colors.redAccent,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Akun tidak ditemukan atau salah password'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
         }
       } catch (e) {
+        debugPrint("Login Error details: $e");
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Gagal masuk: ${e.toString().contains('Koneksi') ? e.toString() : 'Terjadi kesalahan sistem'}',
+              ),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
         }
       }
     }
@@ -271,131 +268,155 @@ class _LoginPageState extends State<LoginPage> {
                           child: Column(
                             children: [
                               // Username Field
-                              TextFormField(
-                                controller: _usernameController,
-                                keyboardType: TextInputType.text,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: 'Username',
-                                  labelStyle: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.person_outline,
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.3,
+                              FormField<String>(
+                                builder: (state) {
+                                  return TextFormField(
+                                    key: const ValueKey('login_username'),
+                                    controller: _usernameController,
+                                    keyboardType: TextInputType.text,
+                                    autofillHints: const [
+                                      AutofillHints.username,
+                                    ],
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Username',
+                                      labelStyle: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.8,
+                                        ),
+                                      ),
+                                      prefixIcon: Icon(
+                                        Icons.person_outline,
+                                        color: Colors.white.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                      focusedErrorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.redAccent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withValues(
+                                        alpha: 0.05,
                                       ),
                                     ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.white,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.redAccent,
-                                    ),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.redAccent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(
-                                    alpha: 0.05,
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Username tidak boleh kosong';
-                                  }
-                                  return null;
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Username tidak boleh kosong';
+                                      }
+                                      return null;
+                                    },
+                                  );
                                 },
                               ),
 
                               const SizedBox(height: 20),
 
                               // Password Field
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  labelStyle: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.lock_outline,
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                  ),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.7,
+                              FormField<String>(
+                                builder: (state) {
+                                  return TextFormField(
+                                    key: const ValueKey('login_password'),
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    autofillHints: const [
+                                      AutofillHints.password,
+                                    ],
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Password',
+                                      labelStyle: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.8,
+                                        ),
+                                      ),
+                                      prefixIcon: Icon(
+                                        Icons.lock_outline,
+                                        color: Colors.white.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                      ),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility_off
+                                              : Icons.visibility,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _obscurePassword =
+                                              !_obscurePassword,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                      focusedErrorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.redAccent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withValues(
+                                        alpha: 0.05,
                                       ),
                                     ),
-                                    onPressed: () => setState(
-                                      () =>
-                                          _obscurePassword = !_obscurePassword,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.white,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  errorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.redAccent,
-                                    ),
-                                  ),
-                                  focusedErrorBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: const BorderSide(
-                                      color: Colors.redAccent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(
-                                    alpha: 0.05,
-                                  ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Password tidak boleh kosong';
-                                  }
-                                  if (value.length < 6) {
-                                    return 'Password minimal 6 karakter';
-                                  }
-                                  return null;
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Password tidak boleh kosong';
+                                      }
+                                      if (value.length < 6) {
+                                        return 'Password minimal 6 karakter';
+                                      }
+                                      return null;
+                                    },
+                                  );
                                 },
                               ),
 
