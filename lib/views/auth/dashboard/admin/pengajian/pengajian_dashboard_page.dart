@@ -1162,8 +1162,10 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                                       ),
                                       const SizedBox(height: 4),
                                       _LiveCountdownBadge(
+                                        pengajianId: item.id,
                                         startedAt: item.startedAt,
                                         endedAt: item.endedAt,
+                                        pengajianService: _pengajianService,
                                       ),
                                     ],
                                   ),
@@ -1892,10 +1894,17 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
 }
 
 class _LiveCountdownBadge extends StatefulWidget {
+  final String pengajianId;
   final DateTime startedAt;
   final DateTime? endedAt;
+  final PengajianService pengajianService;
 
-  const _LiveCountdownBadge({required this.startedAt, this.endedAt});
+  const _LiveCountdownBadge({
+    required this.pengajianId,
+    required this.startedAt,
+    this.endedAt,
+    required this.pengajianService,
+  });
 
   @override
   State<_LiveCountdownBadge> createState() => _LiveCountdownBadgeState();
@@ -1903,6 +1912,7 @@ class _LiveCountdownBadge extends StatefulWidget {
 
 class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
   Timer? _timer;
+  bool _isAutoClosing = false;
 
   @override
   void initState() {
@@ -1922,6 +1932,19 @@ class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
     super.dispose();
   }
 
+  Future<void> _handleAutoClose() async {
+    if (_isAutoClosing) return;
+    _isAutoClosing = true;
+    try {
+      debugPrint("Auto Closing Room: ${widget.pengajianId}");
+      await widget.pengajianService.closePengajian(widget.pengajianId);
+    } catch (e) {
+      debugPrint("Error in Auto Close: $e");
+    } finally {
+      if (mounted) _isAutoClosing = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -1930,27 +1953,41 @@ class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
 
     String label;
     Color color;
+    bool isUrgent = false;
 
-    if (end != null && now.isAfter(end)) {
-      label = "SELESAI";
-      color = Colors.grey;
-      _timer?.cancel();
-    } else if (now.isBefore(start)) {
-      final diff = start.difference(now);
-      String countdown;
-      if (diff.inHours > 0) {
-        countdown =
-            "${diff.inHours}j ${(diff.inMinutes % 60)}m ${(diff.inSeconds % 60)}s";
-      } else if (diff.inMinutes > 0) {
-        countdown = "${diff.inMinutes}m ${(diff.inSeconds % 60)}s";
+    // A. Check if past absolute end + 15 mins
+    if (end != null) {
+      final graceEnd = end.add(const Duration(minutes: 15));
+      if (now.isAfter(graceEnd)) {
+        label = "ROOM DITUTUP (TIDAK HADIR OTOMATIS)";
+        color = Colors.red;
+        _timer?.cancel();
+        // Trigger auto close
+        WidgetsBinding.instance.addPostFrameCallback((_) => _handleAutoClose());
+      } else if (now.isAfter(end)) {
+        // B. Grace Period: 0 to 15 mins after end
+        final diff = graceEnd.difference(now);
+        final countdown = "${diff.inMinutes}m ${diff.inSeconds % 60}s";
+        label = "PENGAJIAN SELESAI • DITUTUP DALAM $countdown";
+        color = Colors.red;
+        isUrgent = true;
+      } else if (now.isBefore(start)) {
+        // C. Upcoming
+        final diff = start.difference(now);
+        String countdown;
+        if (diff.inHours > 0) {
+          countdown =
+              "${diff.inHours}j ${(diff.inMinutes % 60)}m ${(diff.inSeconds % 60)}s";
+        } else if (diff.inMinutes > 0) {
+          countdown = "${diff.inMinutes}m ${(diff.inSeconds % 60)}s";
+        } else {
+          countdown = "${diff.inSeconds}s";
+        }
+        label = "AKAN DATANG ($countdown LAGI)";
+        color = Colors.orange;
       } else {
-        countdown = "${diff.inSeconds}s";
-      }
-      label = "AKAN DATANG ($countdown LAGI)";
-      color = Colors.orange;
-    } else {
-      final diff = end?.difference(now);
-      if (diff != null && diff.inSeconds > 0) {
+        // D. Currently Running
+        final diff = end.difference(now);
         String remaining;
         if (diff.inHours > 0) {
           remaining =
@@ -1961,16 +1998,25 @@ class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
           remaining = "${diff.inSeconds}s";
         }
         label = "SEDANG BERLANGSUNG • SISA $remaining";
+        color = const Color(0xFF1A5F2D);
+      }
+    } else {
+      // E. Manual End Time
+      if (now.isBefore(start)) {
+        label = "AKAN DATANG";
+        color = Colors.orange;
       } else {
         label = "SEDANG BERLANGSUNG";
+        color = const Color(0xFF1A5F2D);
       }
-      color = const Color(0xFF1A5F2D);
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: isUrgent
+            ? Colors.red
+            : color.withValues(alpha: isUrgent ? 1.0 : 0.1),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
@@ -1979,7 +2025,7 @@ class _LiveCountdownBadgeState extends State<_LiveCountdownBadge> {
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.bold,
-          color: color,
+          color: isUrgent ? Colors.white : color,
         ),
       ),
     );

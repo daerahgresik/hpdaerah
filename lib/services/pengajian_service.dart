@@ -18,11 +18,20 @@ class PengajianService {
     String? targetAudience,
   }) async {
     try {
+      // Convert input times to UTC for safe DB comparison
+      final startedAtUtc = startedAt.toUtc();
+      final endedAtUtc = endedAt.toUtc();
+      final nowUtc = DateTime.now().toUtc();
+
+      // Query hierarchical overlap: find ANY room that involves this orgId
+      // to prevent double booking at any level in the same hierarchy.
       final response = await _client
           .from('pengajian')
           .select('id, title, started_at, ended_at, target_audience')
-          .eq('org_id', orgId)
-          .eq('is_template', false);
+          .eq('is_template', false)
+          .or(
+            'org_id.eq.$orgId,org_daerah_id.eq.$orgId,org_desa_id.eq.$orgId,org_kelompok_id.eq.$orgId',
+          );
 
       final List<dynamic> rooms = response as List<dynamic>;
 
@@ -30,33 +39,35 @@ class PengajianService {
         final roomStartedAtStr = room['started_at'] as String?;
         if (roomStartedAtStr == null) continue;
 
-        final roomStartedAt = DateTime.parse(roomStartedAtStr);
+        // Supabase returns UTC strings, ensure we treat them as such
+        final roomStartedAt = DateTime.parse(roomStartedAtStr).toUtc();
 
-        // Asumsi durasi default 3 jam jika ended_at null di database
+        // Duration fallback: 4 hours if ended_at is null (safety margin)
         final roomEndedAt = room['ended_at'] != null
-            ? DateTime.parse(room['ended_at'])
-            : roomStartedAt.add(const Duration(hours: 3));
+            ? DateTime.parse(room['ended_at']).toUtc()
+            : roomStartedAt.add(const Duration(hours: 4));
 
-        // Skip jika room sudah berakhir di masa lalu
-        if (roomEndedAt.isBefore(DateTime.now())) continue;
+        // Skip if room ended more than 1 minute ago (ignore grace periods for overlap)
+        if (roomEndedAt.isBefore(nowUtc.subtract(const Duration(minutes: 1)))) {
+          continue;
+        }
 
-        // Overlap Logic:
-        // Cek apakah rentang waktu bertabrakan
+        // Overlap Logic (UTC vs UTC):
         final bool overlaps =
-            startedAt.isBefore(roomEndedAt) && endedAt.isAfter(roomStartedAt);
+            startedAtUtc.isBefore(roomEndedAt) &&
+            endedAtUtc.isAfter(roomStartedAt);
 
         if (overlaps) {
-          // Boleh ada yang sama tapi target usernya harus berbeda
           final existingTarget = room['target_audience']?.toString() ?? 'Semua';
           final newTarget = targetAudience ?? 'Semua';
 
           if (existingTarget == newTarget) {
-            // Siapkan pesan tunggu
+            final localEndedAt = roomEndedAt.toLocal();
             String waitMessage =
-                "hingga ${roomEndedAt.hour.toString().padLeft(2, '0')}:${roomEndedAt.minute.toString().padLeft(2, '0')}";
+                "hingga ${localEndedAt.hour.toString().padLeft(2, '0')}:${localEndedAt.minute.toString().padLeft(2, '0')}";
             return {
               'title': room['title'] ?? 'Room Lain',
-              'ended_at': roomEndedAt,
+              'ended_at': localEndedAt,
               'wait_message': waitMessage,
             };
           }
@@ -410,12 +421,13 @@ class PengajianService {
 
               DateTime now = DateTime.now();
 
-              // Rule: Show if it hasn't ended yet
+              // Rule: Show if it hasn't ended yet (+ 15 mins grace period)
               bool hasEnded = false;
               if (endedAtStr != null) {
                 try {
                   final endedAt = DateTime.parse(endedAtStr).toLocal();
-                  if (endedAt.isBefore(now)) {
+                  // Extend life for 15 minutes after actual end time
+                  if (endedAt.add(const Duration(minutes: 15)).isBefore(now)) {
                     hasEnded = true;
                   }
                 } catch (_) {}
