@@ -5,7 +5,7 @@ import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/barcode_scanner_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/barcode_scanner_page.dart';
 
 class PengajianDetailPage extends StatefulWidget {
   final Pengajian pengajian;

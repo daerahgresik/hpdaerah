@@ -3,7 +3,7 @@ import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_template_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_template_service.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_form_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/buatroom/pengajian_form_page.dart';
 
 class PengajianLevelPage extends StatefulWidget {
   final UserModel user;

@@ -6,14 +6,14 @@ import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/pengajian_level_selector.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/buatroom/pengajian_level_selector.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayatpengajian.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/khataman/khataman_page.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/manual_presence_sheet.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayat/riwayatpengajian.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/khataman/khataman_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/manual_presence_sheet.dart';
 import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/barcode_scanner_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/barcode_scanner_page.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -38,6 +38,16 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   bool _showHistoryRoom = false; // New Menu State
   bool _showKhataman = false;
   bool _showSearchRoom = false; // Still needed for logic inside Active Room
+
+  void _toggleMenu(String menu) {
+    setState(() {
+      _showCreateRoom = menu == 'create' ? !_showCreateRoom : false;
+      _showActiveRoom = menu == 'active' ? !_showActiveRoom : false;
+      _showHistoryRoom = menu == 'history' ? !_showHistoryRoom : false;
+      _showKhataman = menu == 'khataman' ? !_showKhataman : false;
+      _showSearchRoom = false; // Reset search room when switching
+    });
+  }
 
   // For Search Room logic
   final _searchCodeCtrl = TextEditingController();
@@ -397,17 +407,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         ? Icons.keyboard_arrow_up
                         : Icons.add_circle_outline_rounded,
                     color: const Color(0xFF1A5F2D),
-                    onTap: () {
-                      setState(() {
-                        final newState = !_showCreateRoom;
-                        _showCreateRoom = newState;
-                        if (newState) {
-                          _showActiveRoom = false;
-                          _showHistoryRoom = false;
-                          _showSearchRoom = false;
-                        }
-                      });
-                    },
+                    onTap: () => _toggleMenu('create'),
                     isActive: _showCreateRoom,
                   ),
                 ),
@@ -420,17 +420,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         ? Icons.keyboard_arrow_up
                         : Icons.podcasts_rounded,
                     color: Colors.orange,
-                    onTap: () {
-                      setState(() {
-                        final newState = !_showActiveRoom;
-                        _showActiveRoom = newState;
-                        if (newState) {
-                          _showCreateRoom = false;
-                          _showHistoryRoom = false;
-                          _showSearchRoom = false;
-                        }
-                      });
-                    },
+                    onTap: () => _toggleMenu('active'),
                     isActive: _showActiveRoom,
                   ),
                 ),
@@ -444,17 +434,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         ? Icons.keyboard_arrow_up
                         : Icons.history_edu,
                     color: Colors.purple,
-                    onTap: () {
-                      setState(() {
-                        final newState = !_showHistoryRoom;
-                        _showHistoryRoom = newState;
-                        if (newState) {
-                          _showCreateRoom = false;
-                          _showActiveRoom = false;
-                          _showSearchRoom = false;
-                        }
-                      });
-                    },
+                    onTap: () => _toggleMenu('history'),
                     isActive: _showHistoryRoom,
                   ),
                 ),
@@ -467,18 +447,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                         ? Icons.keyboard_arrow_up
                         : Icons.auto_stories_rounded,
                     color: Colors.amber.shade700,
-                    onTap: () {
-                      setState(() {
-                        final newState = !_showKhataman;
-                        _showKhataman = newState;
-                        if (newState) {
-                          _showCreateRoom = false;
-                          _showActiveRoom = false;
-                          _showHistoryRoom = false;
-                          _showSearchRoom = false;
-                        }
-                      });
-                    },
+                    onTap: () => _toggleMenu('khataman'),
                     isActive: _showKhataman,
                   ),
                 ),

@@ -6,7 +6,7 @@ import 'package:hpdaerah/services/pengajian_qr_service.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/rekap_pengajian_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayat/rekap_pengajian_page.dart';
 
 class HomeTab extends StatelessWidget {
   final UserModel user;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/models/user_model.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/rekap_pengajian_page.dart'; // Import ini
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayat/rekap_pengajian_page.dart'; // Import ini
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';

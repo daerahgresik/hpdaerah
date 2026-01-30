@@ -875,16 +875,33 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     if (context.mounted) {
                       Navigator.pop(ctx);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Pengajian & Materi berhasil dibuat!'),
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.white),
+                              SizedBox(width: 12),
+                              Text('Pengajian & Materi berhasil dibuat!'),
+                            ],
+                          ),
+                          backgroundColor: const Color(0xFF1A5F2D),
+                          behavior: SnackBarBehavior.floating,
                         ),
                       );
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      String msg = e.toString();
+                      if (msg.startsWith('Exception: ')) {
+                        msg = msg.replaceFirst('Exception: ', '');
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(msg),
+                          backgroundColor: Colors.red[700],
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
                     }
                   }
                 },

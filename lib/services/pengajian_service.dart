@@ -15,11 +15,12 @@ class PengajianService {
     required String orgId,
     required DateTime startedAt,
     required DateTime endedAt,
+    String? targetAudience,
   }) async {
     try {
       final response = await _client
           .from('pengajian')
-          .select('id, title, started_at, ended_at')
+          .select('id, title, started_at, ended_at, target_audience')
           .eq('org_id', orgId)
           .eq('is_template', false);
 
@@ -39,20 +40,26 @@ class PengajianService {
         // Skip jika room sudah berakhir di masa lalu
         if (roomEndedAt.isBefore(DateTime.now())) continue;
 
-        // Strict Overlap Logic:
+        // Overlap Logic:
         // Cek apakah rentang waktu bertabrakan
         final bool overlaps =
             startedAt.isBefore(roomEndedAt) && endedAt.isAfter(roomStartedAt);
 
         if (overlaps) {
-          // Siapkan pesan tunggu
-          String waitMessage =
-              "hingga ${roomEndedAt.hour}:${roomEndedAt.minute}";
-          return {
-            'title': room['title'] ?? 'Room Lain',
-            'ended_at': roomEndedAt,
-            'wait_message': waitMessage,
-          };
+          // Boleh ada yang sama tapi target usernya harus berbeda
+          final existingTarget = room['target_audience']?.toString() ?? 'Semua';
+          final newTarget = targetAudience ?? 'Semua';
+
+          if (existingTarget == newTarget) {
+            // Siapkan pesan tunggu
+            String waitMessage =
+                "hingga ${roomEndedAt.hour.toString().padLeft(2, '0')}:${roomEndedAt.minute.toString().padLeft(2, '0')}";
+            return {
+              'title': room['title'] ?? 'Room Lain',
+              'ended_at': roomEndedAt,
+              'wait_message': waitMessage,
+            };
+          }
         }
       }
       return null;
@@ -74,12 +81,13 @@ class PengajianService {
         orgId: pengajian.orgId,
         startedAt: pengajian.startedAt,
         endedAt: validationEndedAt,
+        targetAudience: pengajian.targetAudience,
       );
 
       if (overlap != null) {
         throw Exception(
-          "GAGAL: Room '${overlap['title']}' sedang aktif di jam yang sama.\n"
-          "Anda tidak bisa membuat room ganda di tingkat/organisasi ini sampai room tersebut selesai (${overlap['wait_message']}).",
+          "Kamu tidak bisa membuat room karena ada room aktif: '${overlap['title']}'.\n"
+          "Silakan tunggu hingga room tersebut selesai (${overlap['wait_message']}) atau pilih target peserta yang berbeda.",
         );
       }
 

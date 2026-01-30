@@ -160,7 +160,13 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Pengajian berhasil dibuat!'),
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Pengajian berhasil dibuat!'),
+              ],
+            ),
             backgroundColor: const Color(0xFF1A5F2D),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -172,9 +178,17 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
+        String msg = e.toString();
+        if (msg.startsWith('Exception: ')) {
+          msg = msg.replaceFirst('Exception: ', '');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
