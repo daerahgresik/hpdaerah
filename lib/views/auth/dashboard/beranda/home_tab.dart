@@ -1,12 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/utils/menu_helper.dart';
-import 'package:hpdaerah/models/pengajian_qr_model.dart';
-import 'package:hpdaerah/services/pengajian_qr_service.dart';
-import 'package:hpdaerah/models/pengajian_model.dart';
-import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
-import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/riwayat/rekap_pengajian_page.dart';
+import 'package:hpdaerah/views/auth/dashboard/beranda/percakapan.dart'; // Import Module Percakapan Baru
 
 class HomeTab extends StatelessWidget {
   final UserModel user;
@@ -80,8 +76,8 @@ class HomeTab extends StatelessWidget {
                   children: [
                     const SizedBox(height: 10),
 
-                    // Showing Default Card Only (Requested by User)
-                    _buildDefaultStatusCard(),
+                    // Announcement Card (Announcement + Chat Button)
+                    _buildDefaultStatusCard(context),
                     const SizedBox(height: 32),
 
                     const Padding(
@@ -128,95 +124,9 @@ class HomeTab extends StatelessWidget {
     );
   }
 
-  Widget _buildLiveStatusCard(BuildContext context) {
-    if (user.id == null) return const SizedBox.shrink();
-
-    // 1. If User is Admin, search for active rooms to manage
-    if (user.isAdmin) {
-      return StreamBuilder<List<Pengajian>>(
-        stream: PengajianService().streamActivePengajian(
-          user,
-          user.adminOrgId ?? user.currentOrgId ?? '',
-        ),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _buildErrorStatusCard(snapshot.error.toString());
-          }
-          final activeRooms = snapshot.data ?? [];
-          if (activeRooms.isEmpty) return _buildDefaultStatusCard();
-
-          final latest = activeRooms.first;
-          return _buildInfoCard(
-            context,
-            title: "Pengajian Sedang Berlangsung",
-            subtitle: latest.title,
-            icon: Icons.admin_panel_settings,
-            color: Colors.blue,
-            actionLabel: "Kelola Presensi",
-            onAction: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => RekapPengajianPage(pengajian: latest),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    // 2. For Normal Users (or Admins as participants), search for active QR
-    if (user.id == null) return _buildDefaultStatusCard();
-    return StreamBuilder<List<PengajianQr>>(
-      stream: PengajianQrService().streamActiveQrForUser(user.id!),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _buildErrorStatusCard(snapshot.error.toString());
-        }
-        final activeQrs = (snapshot.data ?? [])
-            .where((q) => !q.isUsed)
-            .toList();
-        if (activeQrs.isEmpty) return _buildDefaultStatusCard();
-
-        final latest = activeQrs.first;
-        return _buildInfoCard(
-          context,
-          title: "Anda Terdaftar di Pengajian",
-          subtitle: latest.pengajianTitle ?? "Pengajian",
-          icon: Icons.qr_code_2,
-          color: const Color(0xFF1A5F2D),
-          actionLabel: "Tampilkan QR",
-          onAction: () => DashboardPage.of(context)?.setSelectedIndex(1),
-        );
-      },
-    );
-  }
-
-  Widget _buildErrorStatusCard(String error) {
+  Widget _buildDefaultStatusCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.red[50],
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.red.shade100),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red[700]),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              "Oops! Gagal memuat data: $error",
-              style: TextStyle(color: Colors.red[900], fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDefaultStatusCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -230,110 +140,60 @@ class HomeTab extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // 1. Icon Pengumuman
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.check_circle, color: Color(0xFF1A5F2D)),
+            child: const Icon(
+              Icons.campaign_outlined,
+              color: Colors.orange,
+              size: 24,
+            ),
           ),
-          const SizedBox(width: 16),
-          const Expanded(
+          const SizedBox(width: 12),
+
+          // 2. Teks Pengumuman
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Status Kehadiran",
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                const Text(
+                  "Papan Pengumuman",
+                  style: TextStyle(color: Colors.grey, fontSize: 11),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  "Akses Mudah & Cepat",
+                  "Belum ada info terbaru hari ini.", // Nanti bisa dinamis
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.grey[800],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildInfoCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required String actionLabel,
-    required VoidCallback onAction,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withValues(alpha: 0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          // 3. Tombol Chat (Sekarang memanggil showPercakapanModal dari file eksternal)
+          Container(
+            margin: const EdgeInsets.only(left: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
             ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onAction,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: color,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            child: IconButton(
+              icon: const Icon(
+                Icons.chat_bubble_outline,
+                color: Color(0xFF1A5F2D),
+                size: 20,
               ),
-              child: Text(
-                actionLabel,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              tooltip: "Ruang Ngobrol",
+              onPressed: () => showPercakapanModal(context, user),
             ),
           ),
         ],
