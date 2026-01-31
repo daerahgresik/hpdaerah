@@ -24,7 +24,7 @@ class _RekapPengajianPageState extends State<RekapPengajianPage> {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _presensiService.streamDetailedAttendance(widget.pengajian.id),
+        stream: _presensiService.streamDetailedAttendance(widget.pengajian),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

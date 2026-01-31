@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
@@ -16,16 +17,37 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   final _presensiService = PresensiService();
   final _picker = ImagePicker();
   final _searchCtrl = TextEditingController();
+
+  // State for converting Stream to Manual Fetch for Stability
+  List<Map<String, dynamic>> _allData = [];
+  bool _isLoading = true;
   String _searchQuery = "";
   bool _isProcessing = false;
-  late Stream<List<Map<String, dynamic>>> _attendanceStream;
 
   @override
   void initState() {
     super.initState();
-    _attendanceStream = _presensiService.streamDetailedAttendance(
-      widget.pengajian.id,
-    );
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    // Silent update if already loaded, else show loader
+    if (_allData.isEmpty) setState(() => _isLoading = true);
+
+    try {
+      final data = await _presensiService.getDetailedAttendanceList(
+        widget.pengajian,
+      );
+      if (mounted) {
+        setState(() {
+          _allData = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching data: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -123,135 +145,140 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
           ),
 
           Expanded(
-            child: Stack(
-              children: [
-                StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: _attendanceStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF1A5F2D),
-                        ),
-                      );
-                    }
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF1A5F2D)),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchData,
+                    color: const Color(0xFF1A5F2D),
+                    child: Builder(
+                      builder: (context) {
+                        // Statistics for Header
+                        final hadir = _allData
+                            .where((e) => e['status'] == 'hadir')
+                            .length;
+                        final izin = _allData
+                            .where((e) => e['status'] == 'izin')
+                            .length;
 
-                    final allData = snapshot.data ?? [];
+                        // Count 'belum_absen' or null status
+                        final belum = _allData.where((e) {
+                          final status = e['status'];
+                          return status == 'belum_absen' || status == null;
+                        }).length;
 
-                    // Statistics for Header
-                    final hadir = allData
-                        .where((e) => e['status'] == 'hadir')
-                        .length;
-                    final tolak = allData
-                        .where((e) => e['status'] == 'tolak')
-                        .length;
-                    final total = allData.length;
+                        final total = _allData.length;
 
-                    final filteredData = allData.where((item) {
-                      final nama = item['nama'].toString().toLowerCase();
-                      final username = item['username']
-                          .toString()
-                          .toLowerCase();
-                      return nama.contains(_searchQuery.toLowerCase()) ||
-                          username.contains(_searchQuery.toLowerCase());
-                    }).toList();
+                        final filteredData = _allData.where((item) {
+                          final nama = item['nama'].toString().toLowerCase();
+                          final username = item['username']
+                              .toString()
+                              .toLowerCase();
+                          return nama.contains(_searchQuery.toLowerCase()) ||
+                              username.contains(_searchQuery.toLowerCase());
+                        }).toList();
 
-                    return Column(
-                      children: [
-                        // Stats Mini Card
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 8,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF1A5F2D,
-                              ).withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(
-                                  0xFF1A5F2D,
-                                ).withValues(alpha: 0.1),
-                              ),
-                            ),
-                            child: Row(
+                        return Stack(
+                          children: [
+                            ListView(
+                              padding: EdgeInsets.zero,
                               children: [
-                                const Icon(
-                                  Icons.people_alt_rounded,
-                                  color: Color(0xFF1A5F2D),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  "Status Kehadiran",
-                                  style: TextStyle(
-                                    color: Colors.grey[800],
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                                // Stats Mini Card
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 8,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: Colors.grey.shade200,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.03,
+                                          ),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
+                                      children: [
+                                        _buildStatItem(
+                                          "Hadir",
+                                          hadir,
+                                          Colors.green,
+                                        ),
+                                        _buildStatDivider(),
+                                        _buildStatItem(
+                                          "Izin",
+                                          izin,
+                                          Colors.orange,
+                                        ),
+                                        _buildStatDivider(),
+                                        _buildStatItem(
+                                          "Belum",
+                                          belum,
+                                          Colors.grey,
+                                        ),
+                                        _buildStatDivider(),
+                                        _buildStatItem(
+                                          "Total",
+                                          total,
+                                          Colors.blueAccent,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                const Spacer(),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      "$hadir / $total Hadir",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1A5F2D),
-                                        fontSize: 14,
-                                      ),
+
+                                // List
+                                if (filteredData.isEmpty)
+                                  SizedBox(
+                                    height: 300,
+                                    child: _buildEmptyState(),
+                                  )
+                                else
+                                  ListView.builder(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
                                     ),
-                                    if (tolak > 0)
-                                      Text(
-                                        "$tolak Verifikasi Gagal",
-                                        style: const TextStyle(
-                                          color: Colors.red,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: filteredData.length,
+                                    itemBuilder: (context, index) {
+                                      final item = filteredData[index];
+                                      return _buildUserTile(item);
+                                    },
+                                  ),
                               ],
                             ),
-                          ),
-                        ),
-
-                        // List
-                        Expanded(
-                          child: filteredData.isEmpty
-                              ? _buildEmptyState()
-                              : ListView.builder(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
+                            if (_isProcessing)
+                              Container(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF1A5F2D),
                                   ),
-                                  itemCount: filteredData.length,
-                                  itemBuilder: (context, index) {
-                                    final item = filteredData[index];
-                                    return _buildUserTile(item);
-                                  },
                                 ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                if (_isProcessing)
-                  Container(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF1A5F2D),
-                      ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
-              ],
-            ),
           ),
         ],
       ),
@@ -442,75 +469,57 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   }
 
   void _showIzinDialog(Map<String, dynamic> item) {
-    String? selectedReason;
-    final otherReasonCtrl = TextEditingController();
-    File? selectedImage;
-
-    final reasons = [
-      "Sakit",
-      "Kerja / Lembur",
-      "Acara Keluarga",
-      "Tugas Luar",
-      "Lainnya",
-    ];
+    final reasonCtrl = TextEditingController();
+    XFile? selectedImage; // Use XFile to support both Web and Mobile
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
+        builder: (context, setDialogState) {
+          // Check if form is valid
+          final bool hasReason = reasonCtrl.text.trim().isNotEmpty;
+          final bool hasImage =
+              selectedImage != null || item['foto_izin'] != null;
+          final bool isValid = hasReason && hasImage;
+
           return AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
             title: Text(
               "Proses Izin: ${item['nama']}",
-              style: const TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 1. REASON INPUT (Free Text)
                   const Text(
                     "Alasan Izin",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedReason,
+                  TextField(
+                    controller: reasonCtrl,
+                    maxLines: 2,
+                    onChanged: (val) =>
+                        setDialogState(() {}), // Trigger rebuild
                     decoration: InputDecoration(
+                      hintText: "Tuliskan alasan izin...",
                       filled: true,
                       fillColor: Colors.grey[50],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
+                      contentPadding: const EdgeInsets.all(12),
                     ),
-                    hint: const Text("Pilih Alasan"),
-                    items: reasons.map((r) {
-                      return DropdownMenuItem(value: r, child: Text(r));
-                    }).toList(),
-                    onChanged: (val) {
-                      setDialogState(() => selectedReason = val);
-                    },
                   ),
-                  if (selectedReason == "Lainnya") ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: otherReasonCtrl,
-                      decoration: InputDecoration(
-                        hintText: "Sebutkan alasan lainnya...",
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 20),
+
+                  // 2. PHOTO INPUT (Camera Only)
                   const Text(
                     "Foto Bukti (Wajib Kamera)",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -520,11 +529,12 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                     onTap: () async {
                       final picked = await _picker.pickImage(
                         source: ImageSource.camera,
-                        imageQuality: 50,
+                        imageQuality: 50, // Auto compress quality
+                        maxWidth: 1024, // Resize if too big
                       );
                       if (picked != null) {
                         setDialogState(() {
-                          selectedImage = File(picked.path);
+                          selectedImage = picked;
                         });
                       }
                     },
@@ -534,27 +544,42 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                       decoration: BoxDecoration(
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(
+                          color: hasImage ? Colors.green : Colors.grey.shade300,
+                          width: hasImage ? 2 : 1,
+                        ),
                       ),
                       child: selectedImage != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                selectedImage!,
-                                fit: BoxFit.cover,
-                              ),
-                            )
+                          ? kIsWeb
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      selectedImage!.path,
+                                      fit:
+                                          BoxFit.contain, // Respect orientation
+                                    ),
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(
+                                      File(selectedImage!.path),
+                                      fit:
+                                          BoxFit.contain, // Respect orientation
+                                    ),
+                                  )
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.camera_alt_outlined,
                                   size: 40,
-                                  color: Colors.green,
+                                  color: hasImage ? Colors.green : Colors.grey,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  "Klik untuk Ambil Foto",
+                                  selectedImage == null
+                                      ? "Klik untuk Ambil Foto"
+                                      : "Ganti Foto",
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 12,
@@ -567,13 +592,33 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
                   if (item['foto_izin'] != null && selectedImage == null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            size: 14,
+                            color: Colors.green,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            "Sudah ada foto bukti sebelumnya",
+                            style: TextStyle(
+                              color: Colors.green[700],
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Validation Message if Incomplete
+                  if (!isValid)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
                       child: Text(
-                        "Sudah ada foto bukti sebelumnya",
-                        style: TextStyle(
-                          color: Colors.green[700],
-                          fontSize: 10,
-                          fontStyle: FontStyle.italic,
-                        ),
+                        "* Mohon lengkapi alasan dan foto bukti",
+                        style: TextStyle(color: Colors.red[300], fontSize: 11),
                       ),
                     ),
                 ],
@@ -586,34 +631,37 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: isValid ? Colors.orange : Colors.grey[300],
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: () {
-                  if (selectedReason == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Pilih alasan izin")),
-                    );
-                    return;
-                  }
-                  if (selectedImage == null && item['foto_izin'] == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Foto bukti wajib")),
-                    );
-                    return;
-                  }
-
-                  final finalReason = selectedReason == "Lainnya"
-                      ? "Lainnya: ${otherReasonCtrl.text}"
-                      : selectedReason!;
-
-                  Navigator.pop(ctx);
-                  _processIzin(item, finalReason, selectedImage);
-                },
-                child: const Text("Simpan Izin"),
+                onPressed: isValid && !isSubmitting
+                    ? () async {
+                        setDialogState(() => isSubmitting = true);
+                        try {
+                          Navigator.pop(ctx); // Close Dialog first
+                          await _processIzin(
+                            item,
+                            reasonCtrl.text.trim(),
+                            selectedImage, // Pass XFile
+                          );
+                        } catch (e) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                      }
+                    : null,
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text("Simpan Izin"),
               ),
             ],
           );
@@ -778,7 +826,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
   Future<void> _processIzin(
     Map<String, dynamic> item,
     String reason,
-    File? image,
+    XFile? image, // Changed from File? to XFile? for Web compatibility
   ) async {
     setState(() => _isProcessing = true);
     try {
@@ -787,6 +835,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
           pengajianId: widget.pengajian.id,
           userId: item['user_id'],
           keterangan: reason,
+          // Pass XFile directly, let service handle cross-platform file reading
           imageFile: image,
         );
       } else {
@@ -805,6 +854,7 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
             backgroundColor: Colors.orange,
           ),
         );
+        _fetchData(); // Refresh Data Manually
       }
     } catch (e) {
       if (mounted) {
@@ -824,8 +874,9 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
         pengajianId: widget.pengajian.id,
         userId: item['user_id'],
         status: status,
-        method: 'manual_admin',
+        method: 'manual',
       );
+      if (mounted) _fetchData(); // Refresh list after manual update
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -854,5 +905,34 @@ class _ManualPresenceSheetState extends State<ManualPresenceSheet> {
         ],
       ),
     );
+  }
+
+  Widget _buildStatItem(String label, int count, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatDivider() {
+    return Container(height: 30, width: 1, color: Colors.grey[200]);
   }
 }

@@ -65,8 +65,8 @@ class _RiwayatPengajianState extends State<RiwayatPengajian> {
       final response = await client
           .from('pengajian')
           .select()
-          .gte('started_at', startOfMonth.toIso8601String())
-          .lte('started_at', endOfMonth.toIso8601String())
+          .gte('started_at', startOfMonth.toUtc().toIso8601String())
+          .lte('started_at', endOfMonth.toUtc().toIso8601String())
           .eq('is_template', false)
           .not('ended_at', 'is', null); // Must be finished
 

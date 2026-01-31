@@ -115,13 +115,15 @@ class PengajianService {
         'description': pengajian.description,
         'target_audience': pengajian.targetAudience,
         'room_code': roomCode,
-        'started_at': pengajian.startedAt.toIso8601String(),
-        'ended_at': pengajian.endedAt?.toIso8601String(),
+        'started_at': pengajian.startedAt.toUtc().toIso8601String(),
+        'ended_at': pengajian.endedAt?.toUtc().toIso8601String(),
         'created_by': _client.auth.currentUser?.id,
         'is_template': false,
         'org_daerah_id': pengajian.orgDaerahId,
         'org_desa_id': pengajian.orgDesaId,
         'org_kelompok_id': pengajian.orgKelompokId,
+        'materi_guru': pengajian.materiGuru,
+        'materi_isi': pengajian.materiIsi,
       };
 
       if (pengajian.id.isNotEmpty) {
@@ -176,8 +178,10 @@ class PengajianService {
         'target_audience': pengajian.targetAudience,
         'target_kriteria_id': pengajian.targetKriteriaId,
         'room_code': pengajian.roomCode,
-        'started_at': pengajian.startedAt.toIso8601String(),
-        'ended_at': pengajian.endedAt?.toIso8601String(),
+        'started_at': pengajian.startedAt.toUtc().toIso8601String(),
+        'ended_at': pengajian.endedAt?.toUtc().toIso8601String(),
+        'materi_guru': pengajian.materiGuru,
+        'materi_isi': pengajian.materiIsi,
       };
 
       await _client.from('pengajian').update(data).eq('id', pengajian.id);
@@ -330,7 +334,7 @@ class PengajianService {
       // 4. Update pengajian set ended_at to NOW
       await _client
           .from('pengajian')
-          .update({'ended_at': DateTime.now().toIso8601String()})
+          .update({'ended_at': DateTime.now().toUtc().toIso8601String()})
           .eq('id', id);
 
       debugPrint('Pengajian $id closed (Finished)');

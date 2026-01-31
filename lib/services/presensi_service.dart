@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/presensi_model.dart';
 import '../models/user_model.dart';
+import '../models/pengajian_model.dart';
+import '../models/target_kriteria_model.dart';
 import '../utils/image_helper.dart';
 
 class PresensiService {
@@ -23,6 +25,18 @@ class PresensiService {
         'method': method,
         'approved_by': _client.auth.currentUser?.id,
       });
+
+      // Also mark QR as used if exists (Auto-Consume QR)
+      try {
+        await _client
+            .from('pengajian_qr')
+            .update({'is_used': true})
+            .eq('pengajian_id', pengajianId)
+            .eq('user_id', userId);
+      } catch (qrError) {
+        // Ignore QR update errors, primary goal is presensi
+        debugPrint("Failed to update QR status: $qrError");
+      }
     } catch (e) {
       throw Exception('Gagal mencatat kehadiran: $e');
     }
@@ -93,14 +107,15 @@ class PresensiService {
       // 2. Upload photo
       final photoUrl = await _uploadIzinPhoto(userId, compressedFile);
 
-      // 2. Record presence as 'izin'
-      await _client.from('presensi').insert({
+      // 2. Record presence as 'izin' (Use Upsert to handle updates)
+      await _client.from('presensi').upsert({
         'pengajian_id': pengajianId,
         'user_id': userId,
         'status': 'izin',
         'method': 'izin',
         'keterangan': keterangan,
         'foto_izin': photoUrl,
+        'approved_by': _client.auth.currentUser?.id,
       });
 
       // 3. Mark QR as used in pengajian_qr table (if exists)
@@ -292,15 +307,15 @@ class PresensiService {
   // Refactor: Get all targets for a pengajian with status
   // STREAM VERSION: Realtime targets + attendance
   Stream<List<Map<String, dynamic>>> streamDetailedAttendance(
-    String pengajianId,
+    Pengajian pengajian,
   ) {
     // Listen to ANY change in presensi for this pengajian to trigger a refresh
     return _client
         .from('presensi')
         .stream(primaryKey: ['id'])
-        .eq('pengajian_id', pengajianId)
+        .eq('pengajian_id', pengajian.id)
         .asyncMap((_) async {
-          return await getDetailedAttendanceList(pengajianId);
+          return await getDetailedAttendanceList(pengajian);
         })
         .handleError((error) {
           debugPrint('Stream Detailed Attendance Error: $error');
@@ -309,57 +324,128 @@ class PresensiService {
   }
 
   Future<List<Map<String, dynamic>>> getDetailedAttendanceList(
-    String pengajianId,
+    Pengajian pengajian,
   ) async {
     try {
-      // 1. Get QR targets
-      final qrResponse = await _client
-          .from('pengajian_qr')
-          .select('user_id, is_used')
-          .eq('pengajian_id', pengajianId);
-      final List<dynamic> qrRaw = qrResponse;
-
-      // 2. Get Presence records
+      // 1. Get Presence records (Realtime Status)
       final presensiResponse = await _client
           .from('presensi')
           .select('user_id, status, method, keterangan, foto_izin, created_at')
-          .eq('pengajian_id', pengajianId);
+          .eq('pengajian_id', pengajian.id);
       final List<dynamic> presensiRaw = presensiResponse;
 
-      // 3. Collect unique User IDs
-      final userIds = <String>{};
-      for (var q in qrRaw) {
-        if (q['user_id'] != null) userIds.add(q['user_id'] as String);
-      }
-      for (var p in presensiRaw) {
-        if (p['user_id'] != null) userIds.add(p['user_id'] as String);
-      }
-
-      if (userIds.isEmpty) return [];
-
-      // 4. Batch fetch User details with organization names
-      final userResponse = await _client
-          .from('users')
-          .select('''
+      // 2. Prepare User Query
+      var query = _client.from('users').select('''
             id, nama, username, foto_profil,
             org_daerah:organizations!org_daerah_id(name),
             org_desa:organizations!org_desa_id(name),
             org_kelompok:organizations!org_kelompok_id(name)
-          ''')
-          .filter('id', 'in', userIds.toList());
-      final List<dynamic> usersData = userResponse;
-      final userMap = {for (var u in usersData) u['id'] as String: u};
+          ''');
+
+      PostgrestFilterBuilder? filterQuery;
+      TargetKriteria? target;
+
+      // 3. TARGET CRITERIA LOGIC (PRIORITY)
+      if (pengajian.targetKriteriaId != null &&
+          pengajian.targetKriteriaId!.isNotEmpty) {
+        final targetData = await _client
+            .from('target_kriteria')
+            .select()
+            .eq('id', pengajian.targetKriteriaId!)
+            .maybeSingle();
+
+        if (targetData != null) {
+          target = TargetKriteria.fromJson(targetData);
+
+          // A. Scope Filter
+          // Note: Target defines the scope.
+          if (target.orgKelompokId != null &&
+              target.orgKelompokId!.isNotEmpty) {
+            query = query.eq('org_kelompok_id', target.orgKelompokId!);
+          } else if (target.orgDesaId != null && target.orgDesaId!.isNotEmpty) {
+            query = query.eq('org_desa_id', target.orgDesaId!);
+          } else if (target.orgDaerahId != null &&
+              target.orgDaerahId!.isNotEmpty) {
+            query = query.eq('org_daerah_id', target.orgDaerahId!);
+          }
+
+          // B. Demographic Filter
+          if (target.jenisKelamin != 'Semua') {
+            query = query.eq('jenis_kelamin', target.jenisKelamin);
+          }
+          if (target.statusPernikahan != 'Semua') {
+            query = query.eq('status', target.statusPernikahan);
+          }
+          if (target.statusWarga != 'Semua') {
+            query = query.eq('asal', target.statusWarga);
+          }
+          if (target.keperluan != 'Semua') {
+            query = query.eq('keperluan', target.keperluan);
+          }
+
+          // C. Age Filter
+          // minUmur, maxUmur.
+          // Born AFTER (now - maxUmur) AND BEFORE (now - minUmur)
+          // Exception: If min=0 and max=100, we skip to save performance
+          if (target.minUmur > 0 || target.maxUmur < 100) {
+            final now = DateTime.now();
+            final maxBirthDate = DateTime(
+              now.year - target.minUmur,
+              now.month,
+              now.day,
+            ); // Younger limit
+            final minBirthDate = DateTime(
+              now.year - target.maxUmur,
+              now.month,
+              now.day,
+            ); // Older limit
+
+            // Logic: tanggal_lahir <= maxBirthDate AND tanggal_lahir >= minBirthDate
+            query = query
+                .lte(
+                  'tanggal_lahir',
+                  maxBirthDate.toIso8601String().split('T')[0],
+                )
+                .gte(
+                  'tanggal_lahir',
+                  minBirthDate.toIso8601String().split('T')[0],
+                );
+          }
+
+          filterQuery = query;
+        }
+      }
+
+      // 4. FALLBACK LOGIC (If no target criteria or loading it failed)
+      if (filterQuery == null) {
+        if (pengajian.orgKelompokId != null &&
+            pengajian.orgKelompokId!.isNotEmpty) {
+          filterQuery = query.eq('org_kelompok_id', pengajian.orgKelompokId!);
+        } else if (pengajian.orgDesaId != null &&
+            pengajian.orgDesaId!.isNotEmpty) {
+          filterQuery = query.eq('org_desa_id', pengajian.orgDesaId!);
+        } else if (pengajian.orgDaerahId != null &&
+            pengajian.orgDaerahId!.isNotEmpty) {
+          filterQuery = query.eq('org_daerah_id', pengajian.orgDaerahId!);
+        } else if (pengajian.orgId.isNotEmpty) {
+          filterQuery = query.eq('current_org_id', pengajian.orgId);
+        }
+      }
+
+      // If still null, return empty
+      if (filterQuery == null) return [];
+
+      // Execute User Query
+      final List<dynamic> usersData = await filterQuery;
 
       // 5. Merge into consolidated list
-      return userIds.map((uid) {
-        final userData = userMap[uid] ?? {};
-        final qrData = qrRaw.firstWhere(
-          (q) => q['user_id'] == uid,
-          orElse: () => {},
-        );
+      return usersData.map((userData) {
+        final uid = userData['id'] as String;
+
+        // Find presence info if exists
         final pData = presensiRaw.firstWhere(
           (p) => p['user_id'] == uid,
-          orElse: () => {},
+          orElse: () => <String, dynamic>{},
         );
 
         return {
@@ -370,7 +456,8 @@ class PresensiService {
           'daerah': userData['org_daerah']?['name'],
           'desa': userData['org_desa']?['name'],
           'kelompok': userData['org_kelompok']?['name'],
-          'is_used': qrData['is_used'] ?? false,
+          'is_used':
+              pData.isNotEmpty, // If presence exists, they "used" the session
           'status': pData['status'] ?? 'belum_absen',
           'method': pData['method'],
           'keterangan': pData['keterangan'],
@@ -400,11 +487,15 @@ class PresensiService {
       });
 
       // Also mark QR as used
-      await _client
-          .from('pengajian_qr')
-          .update({'is_used': true})
-          .eq('pengajian_id', pengajianId)
-          .eq('user_id', userId);
+      try {
+        await _client
+            .from('pengajian_qr')
+            .update({'is_used': true})
+            .eq('pengajian_id', pengajianId)
+            .eq('user_id', userId);
+      } catch (qrError) {
+        debugPrint("Failed to update QR status (Manual Izin): $qrError");
+      }
     } catch (e) {
       throw Exception('Gagal mencatat izin manual: $e');
     }
