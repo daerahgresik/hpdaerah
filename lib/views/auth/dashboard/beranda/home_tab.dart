@@ -78,11 +78,7 @@ class HomeTab extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   children: [
-                    const SizedBox(height: 10),
-
-                    // Live Status Card
-                    _buildLiveStatusCard(context),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.0),
