@@ -6,6 +6,7 @@ import 'package:hpdaerah/views/auth/dashboard/navigator_menu_utama.dart';
 import 'package:hpdaerah/views/auth/dashboard/qrcode/qr_code_tab.dart';
 import 'package:hpdaerah/views/auth/dashboard/profil/profile_tab.dart';
 import 'package:hpdaerah/services/notification_service.dart';
+import 'package:hpdaerah/services/auto_qr_service.dart';
 
 // Dashboard Page Controller
 class DashboardPage extends StatefulWidget {
@@ -27,6 +28,12 @@ class DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _initNotifications();
+
+    // START BACKGROUD AUTO QR ENGINE (ADMIN ONLY)
+    // Runs automatically when Admin logs in.
+    if (widget.user.isAdmin) {
+      AutoQrService.instance.start();
+    }
   }
 
   void _initNotifications() async {

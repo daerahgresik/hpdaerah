@@ -32,9 +32,96 @@
 
   <title>hadirce</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      background-color: #1A5F2D;
+      /* Primary Green */
+      background: radial-gradient(circle at center, #24753a 0%, #1A5F2D 100%);
+      /* Subtle Gradient */
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    /* RIPPLE ANIMATION CONTAINER */
+    .ripple-loader {
+      display: inline-block;
+      position: relative;
+      width: 80px;
+      height: 80px;
+    }
+
+    /* THE RINGS */
+    .ripple-loader div {
+      position: absolute;
+      border: 4px solid #fff;
+      opacity: 1;
+      border-radius: 50%;
+      animation: ripple 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
+
+    .ripple-loader div:nth-child(2) {
+      animation-delay: -0.5s;
+    }
+
+    @keyframes ripple {
+      0% {
+        top: 36px;
+        left: 36px;
+        width: 0;
+        height: 0;
+        opacity: 0;
+      }
+
+      5% {
+        opacity: 1;
+      }
+
+      100% {
+        top: 0;
+        left: 0;
+        width: 72px;
+        height: 72px;
+        opacity: 0;
+      }
+    }
+
+    /* BREATHING TEXT */
+    .loading-text {
+      margin-top: 30px;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 500;
+      letter-spacing: 3px;
+      font-size: 14px;
+      animation: breathe 2s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+
+      0%,
+      100% {
+        opacity: 0.6;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <div class="ripple-loader">
+    <div></div>
+    <div></div>
+  </div>
+  <div class="loading-text">MEMUAT APLIKASI...</div>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
