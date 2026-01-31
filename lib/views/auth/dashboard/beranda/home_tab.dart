@@ -78,7 +78,11 @@ class HomeTab extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   children: [
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 10),
+
+                    // Showing Default Card Only (Requested by User)
+                    _buildDefaultStatusCard(),
+                    const SizedBox(height: 32),
 
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.0),
