@@ -26,7 +26,6 @@ class _PenggunaListPageState extends State<PenggunaListPage>
 
   final List<Map<String, dynamic>> _filterOptions = [
     {'label': 'Semua', 'level': null, 'icon': Icons.people},
-    {'label': 'Super Admin', 'level': 0, 'icon': Icons.shield},
     {'label': 'Admin Daerah', 'level': 1, 'icon': Icons.location_city},
     {'label': 'Admin Desa', 'level': 2, 'icon': Icons.home_work},
     {'label': 'Admin Kelompok', 'level': 3, 'icon': Icons.groups},
@@ -277,14 +276,35 @@ class _PenggunaListPageState extends State<PenggunaListPage>
     String? orgId,
   ) async {
     try {
-      await Supabase.instance.client
+      debugPrint('=== Setting Admin Level ===');
+      debugPrint('User ID: ${user['id']}');
+      debugPrint('New Level: $level');
+      debugPrint('New Org ID: $orgId');
+
+      // Perform the update
+      final response = await Supabase.instance.client
           .from('users')
           .update({
             'is_admin': level != null,
             'admin_level': level,
             'admin_org_id': orgId,
           })
-          .eq('id', user['id']);
+          .eq('id', user['id'])
+          .select(); // Add select to get the updated data
+
+      debugPrint('Update response: $response');
+
+      // Verify the update
+      final verifyResponse = await Supabase.instance.client
+          .from('users')
+          .select('id, nama, is_admin, admin_level, admin_org_id')
+          .eq('id', user['id'])
+          .single();
+
+      debugPrint('Verified data: $verifyResponse');
+      debugPrint('is_admin: ${verifyResponse['is_admin']}');
+      debugPrint('admin_level: ${verifyResponse['admin_level']}');
+      debugPrint('admin_org_id: ${verifyResponse['admin_org_id']}');
 
       await _loadData();
       final levelName = _getAdminLevelName(level);
@@ -297,7 +317,9 @@ class _PenggunaListPageState extends State<PenggunaListPage>
             ? '${user['nama']} → $levelName${orgName != null ? ' ($orgName)' : ''}'
             : '${user['nama']} bukan admin lagi',
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error setting admin level: $e');
+      debugPrint('Stack trace: $stackTrace');
       _showSnackBar('Gagal: $e', isError: true);
     }
   }
