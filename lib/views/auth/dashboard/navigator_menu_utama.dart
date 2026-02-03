@@ -203,7 +203,14 @@ class _AdminTabState extends State<AdminTab> {
         );
 
       case '/admin/pengguna':
-        return PenggunaListPage(currentUser: widget.user);
+        return PenggunaListPage(
+          currentUser: widget.user.isSuperAdmin
+              ? widget.user.copyWith(
+                  adminLevel: _effectiveAdminLevel,
+                  adminOrgId: _effectiveOrgId,
+                )
+              : widget.user,
+        );
 
       default:
         return const Center(child: Text('Halaman Belum Tersedia'));

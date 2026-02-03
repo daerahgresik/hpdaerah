@@ -15,6 +15,7 @@ import 'package:hpdaerah/models/pengajian_qr_model.dart';
 import 'package:hpdaerah/services/pengajian_qr_service.dart';
 import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/barcode_scanner_page.dart';
 import 'package:hpdaerah/services/target_kriteria_service.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/aturkelas/aturkelas.dart';
 
 class PengajianDashboardPage extends StatefulWidget {
   final UserModel user;
@@ -39,6 +40,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
   bool _showActiveRoom = false;
   bool _showHistoryRoom = false; // New Menu State
   bool _showKhataman = false;
+  bool _showAturKelas = false; // Atur Kelas Menu
   bool _showSearchRoom = false; // Still needed for logic inside Active Room
 
   void _toggleMenu(String menu) {
@@ -47,6 +49,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
       _showActiveRoom = menu == 'active' ? !_showActiveRoom : false;
       _showHistoryRoom = menu == 'history' ? !_showHistoryRoom : false;
       _showKhataman = menu == 'khataman' ? !_showKhataman : false;
+      _showAturKelas = menu == 'aturkelas' ? !_showAturKelas : false;
       _showSearchRoom = false; // Reset search room when switching
     });
   }
@@ -397,10 +400,25 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const SizedBox(height: 20),
             ],
 
-            // HORIZONTAL MENU ROW (4 Items)
+            // HORIZONTAL MENU ROW (5 Items)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // 1. ATUR KELAS
+                Expanded(
+                  child: _buildMenuCard(
+                    context,
+                    title: 'Atur Kelas',
+                    icon: _showAturKelas
+                        ? Icons.keyboard_arrow_up
+                        : Icons.school_rounded,
+                    color: Colors.teal,
+                    onTap: () => _toggleMenu('aturkelas'),
+                    isActive: _showAturKelas,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // 2. BUAT ROOM
                 Expanded(
                   child: _buildMenuCard(
                     context,
@@ -414,6 +432,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                   ),
                 ),
                 const SizedBox(width: 4),
+                // 3. ROOM AKTIF
                 Expanded(
                   child: _buildMenuCard(
                     context,
@@ -427,7 +446,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                // RIWAYAT MENU
+                // 4. RIWAYAT
                 Expanded(
                   child: _buildMenuCard(
                     context,
@@ -441,6 +460,7 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
                   ),
                 ),
                 const SizedBox(width: 4),
+                // 5. KHATAMAN
                 Expanded(
                   child: _buildMenuCard(
                     context,
@@ -529,12 +549,22 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               const KhatamanPage(),
             ],
 
+            // INLINE ATUR KELAS
+            if (_showAturKelas) ...[
+              const SizedBox(height: 24),
+              AturKelasPage(
+                user: widget.user,
+                orgId: _selectedOrgId ?? widget.orgId,
+              ),
+            ],
+
             // DEFAULT: Show Insight Dashboard when no menu is selected
             if (!_showCreateRoom &&
                 !_showActiveRoom &&
                 !_showSearchRoom &&
                 !_showHistoryRoom &&
-                !_showKhataman) ...[
+                !_showKhataman &&
+                !_showAturKelas) ...[
               const SizedBox(height: 24),
               _buildInsightDashboard(context),
             ],

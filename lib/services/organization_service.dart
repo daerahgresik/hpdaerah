@@ -23,7 +23,7 @@ class OrganizationService {
           .from('organizations')
           .select()
           .eq('type', 'daerah')
-          .order('name');
+          .order('name', ascending: true);
 
       final data = response as List<dynamic>;
       return data.map((json) => Organization.fromJson(json)).toList();
@@ -41,7 +41,7 @@ class OrganizationService {
         .from('organizations')
         .stream(primaryKey: ['id'])
         .eq('type', 'daerah')
-        .order('name')
+        .order('name', ascending: true)
         .map(
           (data) => data.map((json) => Organization.fromJson(json)).toList(),
         );
@@ -53,7 +53,7 @@ class OrganizationService {
         .from('organizations')
         .stream(primaryKey: ['id'])
         .eq('parent_id', parentId)
-        .order('name')
+        .order('name', ascending: true)
         .map(
           (data) => data.map((json) => Organization.fromJson(json)).toList(),
         );
@@ -111,7 +111,7 @@ class OrganizationService {
           .from('organizations')
           .select()
           .eq('parent_id', parentId)
-          .order('name');
+          .order('name', ascending: true);
 
       final data = response as List<dynamic>;
       return data.map((json) => Organization.fromJson(json)).toList();

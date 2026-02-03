@@ -80,6 +80,41 @@ class PengajianService {
     }
   }
 
+  /// Check if a room code is currently in use by an active room
+  Future<bool> _isRoomCodeActive(String roomCode) async {
+    try {
+      final response = await _client
+          .from('pengajian')
+          .select('id')
+          .eq('room_code', roomCode)
+          .eq('is_template', false)
+          .isFilter('ended_at', null)
+          .maybeSingle();
+      return response != null;
+    } catch (e) {
+      debugPrint("Error checking room code: $e");
+      return false;
+    }
+  }
+
+  /// Generate a unique 6-digit room code
+  Future<String> _generateUniqueRoomCode() async {
+    const maxAttempts = 10;
+    for (int i = 0; i < maxAttempts; i++) {
+      final code = List.generate(6, (_) => Random().nextInt(10)).join();
+      final isActive = await _isRoomCodeActive(code);
+      if (!isActive) {
+        return code;
+      }
+      debugPrint(
+        "Room code $code already in use, retrying... (${i + 1}/$maxAttempts)",
+      );
+    }
+    // Fallback: use timestamp-based code if all attempts fail
+    final timestamp = DateTime.now().millisecondsSinceEpoch % 1000000;
+    return timestamp.toString().padLeft(6, '0');
+  }
+
   Future<void> createPengajian(Pengajian pengajian) async {
     try {
       // 0. Strict Overlap Check
@@ -102,10 +137,19 @@ class PengajianService {
         );
       }
 
-      // 1. Generate Room Code if empty
+      // 1. Generate UNIQUE Room Code if empty
       String roomCode = pengajian.roomCode ?? '';
       if (roomCode.isEmpty) {
-        roomCode = List.generate(6, (_) => Random().nextInt(10)).join();
+        roomCode = await _generateUniqueRoomCode();
+      } else {
+        // Validate provided room code is not already in use
+        final isCodeActive = await _isRoomCodeActive(roomCode);
+        if (isCodeActive) {
+          throw Exception(
+            "Kode room '$roomCode' sudah digunakan oleh room lain yang masih aktif. "
+            "Silakan gunakan kode lain atau biarkan sistem generate otomatis.",
+          );
+        }
       }
 
       final data = {

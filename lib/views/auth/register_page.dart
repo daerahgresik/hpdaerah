@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:hpdaerah/models/organization_model.dart';
+import 'package:hpdaerah/models/kelas_model.dart';
 import 'package:hpdaerah/controllers/register_controller.dart'; // Import Controller
+import 'package:hpdaerah/services/kelas_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
@@ -59,12 +61,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final RegisterController _registerController =
       RegisterController(); // Use Controller
+  final KelasService _kelasService = KelasService();
 
   // Dynamic Datasets
   List<Organization> _daerahList = [];
   List<Organization> _desaList = [];
   List<Organization> _kelompokList = [];
-  List<Organization> _kelasList = [];
+  List<Kelas> _kelasList = []; // Changed to Kelas model
 
   bool _isLoadingHierarchy = false;
 
@@ -103,8 +106,6 @@ class _RegisterPageState extends State<RegisterPage> {
           _desaList = list;
         } else if (level == 1) {
           _kelompokList = list;
-        } else if (level == 2) {
-          _kelasList = list;
         }
       });
     } catch (e) {
@@ -112,6 +113,25 @@ class _RegisterPageState extends State<RegisterPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingHierarchy = false);
+    }
+  }
+
+  // Load kelas from the new kelas table
+  Future<void> _loadKelas(String kelompokId) async {
+    setState(() => _isLoadingHierarchy = true);
+    try {
+      final list = await _kelasService.fetchKelasByKelompok(kelompokId);
+      setState(() {
+        _kelasList = list;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal memuat kelas: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoadingHierarchy = false);
@@ -1115,7 +1135,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                                 _kelasList.clear();
                                               });
                                               if (val != null) {
-                                                _loadChildren(val, 2);
+                                                _loadKelas(
+                                                  val,
+                                                ); // Load from kelas table
                                               }
                                             },
                                       validator: (val) =>
@@ -1148,7 +1170,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                       items: _kelasList.map((e) {
                                         return DropdownMenuItem(
                                           value: e.id,
-                                          child: Text(e.name),
+                                          child: Text(
+                                            e.nama,
+                                          ), // Changed from e.name
                                         );
                                       }).toList(),
                                       onChanged: _selectedKelompok == null

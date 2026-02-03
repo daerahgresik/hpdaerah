@@ -135,16 +135,6 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
               ),
               const SizedBox(height: 24),
             ],
-
-            // 4. KATEGORI (Muncul untuk semua level admin)
-            _buildSection(
-              context,
-              title: 'KATEGORI / KELAS',
-              level: 'Kategori',
-              color: Colors.orange,
-              icon: Icons.school,
-              templates: templates,
-            ),
           ],
         );
       },
@@ -364,27 +354,71 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
       selectedTargetKriteriaId = null;
     }
 
-    // Sub-organization selection
-    String? selectedSubOrgId;
-    List<Organization> subOrgs = [];
-    bool isLoadingSubOrgs = false;
-    bool needsSubOrg =
-        template.level != null && template.level! >= widget.adminLevel;
+    // Sub-organization selection - CASCADING DROPDOWNS
+    // For Kelompok level template, we need: Desa dropdown → Kelompok dropdown
+    String? selectedDesaId;
+    String? selectedKelompokId;
+    List<Organization> desaList = [];
+    List<Organization> kelompokList = [];
+    bool isLoadingDesa = false;
+    bool isLoadingKelompok = false;
 
-    // Fetch sub-orgs if needed
-    if (needsSubOrg) {
-      isLoadingSubOrgs = true;
+    // Determine what level of dropdowns we need based on template level and admin level
+    final int templateLevel = template.level ?? 0;
+    final bool needsDesaDropdown =
+        templateLevel >= 1 &&
+        widget.adminLevel <= 1; // Admin Daerah needs to pick Desa
+    final bool needsKelompokDropdown =
+        templateLevel >= 2 && widget.adminLevel <= 2; // Need to pick Kelompok
+
+    // Pre-fill if admin already at that level
+    if (widget.adminLevel == 2) {
+      // Admin Desa - auto-select their desa
+      selectedDesaId = widget.user.orgDesaId ?? widget.orgId;
+    }
+    if (widget.adminLevel == 3) {
+      // Admin Kelompok - auto-select their kelompok
+      selectedDesaId = widget.user.orgDesaId;
+      selectedKelompokId = widget.user.orgKelompokId ?? widget.orgId;
+    }
+
+    // Fetch Desa list if needed
+    if (needsDesaDropdown) {
+      isLoadingDesa = true;
       _orgService
           .fetchChildren(widget.orgId)
           .then((list) {
-            subOrgs = list;
-            isLoadingSubOrgs = false;
-            // Optionally auto-select if only one
-            // if (subOrgs.length == 1) selectedSubOrgId = subOrgs.first.id;
+            // Level 1 = Desa (tidak filter by type karena bisa null/tidak konsisten)
+            desaList = list.where((o) => o.level == 1).toList();
+            isLoadingDesa = false;
           })
           .catchError((e) {
-            debugPrint("Error fetching sub-orgs: $e");
+            debugPrint("Error fetching desa list: $e");
+            isLoadingDesa = false;
           });
+    }
+
+    // Helper function to fetch Kelompok based on selected Desa
+    Future<void> fetchKelompok(
+      String desaId,
+      void Function(void Function()) setStateDialog,
+    ) async {
+      setStateDialog(() {
+        isLoadingKelompok = true;
+        kelompokList = [];
+        selectedKelompokId = null;
+      });
+      try {
+        final list = await _orgService.fetchChildren(desaId);
+        setStateDialog(() {
+          // Level 2 = Kelompok
+          kelompokList = list.where((o) => o.level == 2).toList();
+          isLoadingKelompok = false;
+        });
+      } catch (e) {
+        debugPrint("Error fetching kelompok list: $e");
+        setStateDialog(() => isLoadingKelompok = false);
+      }
     }
 
     final List<Map<String, TextEditingController>> materiEntries = [
@@ -489,68 +523,154 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 2. SELECT TARGET WILAYAH (SUBO-ORG)
-                  if (needsSubOrg) ...[
+                  // 2. SELECT TARGET WILAYAH - CASCADING DROPDOWNS
+                  if (needsDesaDropdown || needsKelompokDropdown) ...[
                     const Text(
-                      "Wilayah Target (Sub-Organisasi):",
+                      "Wilayah Target:",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (isLoadingSubOrgs)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else if (subOrgs.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          "Tidak ada sub-organisasi ditemukan. Pengajian akan dibuat di level ini.",
-                          style: TextStyle(fontSize: 12, color: Colors.orange),
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<String>(
-                        value: selectedSubOrgId,
-                        hint: const Text("Pilih Sub-Organisasi"),
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          filled: true,
-                          fillColor: Colors.green[50],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.green.shade200,
+
+                    // DROPDOWN 1: PILIH DESA
+                    if (needsDesaDropdown) ...[
+                      const Text(
+                        "Pilih Desa:",
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 4),
+                      if (isLoadingDesa)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else if (desaList.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            "Tidak ada Desa ditemukan.",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                        ),
-                        items: subOrgs
-                            .map(
-                              (org) => DropdownMenuItem(
-                                value: org.id,
-                                child: Text(org.name),
+                        )
+                      else
+                        DropdownButtonFormField<String>(
+                          value: selectedDesaId,
+                          hint: const Text("Pilih Desa"),
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: Colors.blue[50],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.blue.shade200,
                               ),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          setStateDialog(() => selectedSubOrgId = val);
-                        },
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: desaList
+                              .map(
+                                (org) => DropdownMenuItem(
+                                  value: org.id,
+                                  child: Text(org.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            setStateDialog(() {
+                              selectedDesaId = val;
+                              // Reset kelompok when desa changes
+                              selectedKelompokId = null;
+                              kelompokList = [];
+                            });
+                            // Fetch kelompok if needed
+                            if (val != null && needsKelompokDropdown) {
+                              fetchKelompok(val, setStateDialog);
+                            }
+                          },
+                        ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // DROPDOWN 2: PILIH KELOMPOK (hanya muncul jika Desa sudah dipilih)
+                    if (needsKelompokDropdown && selectedDesaId != null) ...[
+                      const Text(
+                        "Pilih Kelompok:",
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 4),
+                      if (isLoadingKelompok)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else if (kelompokList.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            "Tidak ada Kelompok ditemukan di Desa ini.",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        )
+                      else
+                        DropdownButtonFormField<String>(
+                          value: selectedKelompokId,
+                          hint: const Text("Pilih Kelompok"),
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            filled: true,
+                            fillColor: Colors.green[50],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.green.shade200,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: kelompokList
+                              .map(
+                                (org) => DropdownMenuItem(
+                                  value: org.id,
+                                  child: Text(org.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            setStateDialog(() => selectedKelompokId = val);
+                          },
+                        ),
+                      const SizedBox(height: 12),
+                    ],
+                    const SizedBox(height: 4),
                   ],
 
                   // Waktu Pelaksanaan (Mulai - Selesai)
@@ -813,9 +933,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     );
 
                     // Hierarchical context resolution:
-                    // Priority 1: Use the user's defined hierarchy
-                    // Priority 2: If user is an admin of a certain level, use their adminOrgId
-                    String targetOrgId = selectedSubOrgId ?? widget.orgId;
+                    // Resolve the final target org based on cascading selection
                     String? orgDaerahId = widget.user.orgDaerahId;
                     String? orgDesaId = widget.user.orgDesaId;
                     String? orgKelompokId = widget.user.orgKelompokId;
@@ -832,22 +950,35 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                       orgKelompokId ??= widget.user.adminOrgId;
                     }
 
-                    // If a sub-org was selected, we update the hierarchy for that specific room
-                    if (selectedSubOrgId != null) {
-                      final selectedOrg = subOrgs.firstWhere(
-                        (o) => o.id == selectedSubOrgId,
+                    // Apply cascading selection
+                    if (selectedDesaId != null) {
+                      orgDesaId = selectedDesaId;
+                      // Find parent Daerah from desaList
+                      final selectedDesa = desaList.firstWhere(
+                        (o) => o.id == selectedDesaId,
+                        orElse: () =>
+                            Organization(id: '', name: '', type: 'desa'),
                       );
-                      if (selectedOrg.type == 'daerah') {
-                        orgDaerahId = selectedOrg.id;
-                      } else if (selectedOrg.type == 'desa') {
-                        orgDesaId = selectedOrg.id;
-                        orgDaerahId = selectedOrg.parentId; // Link to parent
-                      } else if (selectedOrg.type == 'kelompok') {
-                        orgKelompokId = selectedOrg.id;
-                        orgDesaId = selectedOrg.parentId;
-                        // For Kelompok, the parent is Desa. We might need to find the Daerah too.
-                        // But for now, this ensures the leaf and its immediate parent are set.
+                      if (selectedDesa.parentId != null) {
+                        orgDaerahId = selectedDesa.parentId;
                       }
+                    }
+                    if (selectedKelompokId != null) {
+                      orgKelompokId = selectedKelompokId;
+                      // Desa already set above, no need to update
+                    }
+
+                    // Determine the final targetOrgId based on template level
+                    String targetOrgId;
+                    if (templateLevel == 2 && selectedKelompokId != null) {
+                      // Kelompok level - use selected Kelompok
+                      targetOrgId = selectedKelompokId!;
+                    } else if (templateLevel == 1 && selectedDesaId != null) {
+                      // Desa level - use selected Desa
+                      targetOrgId = selectedDesaId!;
+                    } else {
+                      // Daerah level or no selection - use widget.orgId
+                      targetOrgId = widget.orgId;
                     }
 
                     // 2. Consolidate Materi (Jika diisi)
@@ -905,6 +1036,9 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     }
                   } catch (e) {
                     if (context.mounted) {
+                      // Tutup dialog dulu agar error SnackBar terlihat di depan
+                      Navigator.pop(ctx);
+
                       String msg = e.toString();
                       if (msg.startsWith('Exception: ')) {
                         msg = msg.replaceFirst('Exception: ', '');
@@ -940,14 +1074,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
   }) {
     final isEdit = template != null;
     final titleController = TextEditingController(text: template?.title ?? '');
-    final locationController = TextEditingController(
-      text: template?.location ?? '',
-    );
     final descController = TextEditingController(
       text: template?.description ?? "Pengajian rutin $level",
-    );
-    final roomCodeController = TextEditingController(
-      text: template?.roomCode ?? '',
     );
 
     String? selectedTargetKriteriaId = template?.targetKriteriaId;
@@ -989,19 +1117,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 2. Lokasi
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Lokasi (Default)',
-                      hintText: 'Contoh: Masjid Al-Ikhlas',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 3. Target Peserta
+                  // 2. Target Peserta
                   DropdownButtonFormField<String>(
                     value: selectedTargetKriteriaId,
                     isExpanded: true,
@@ -1024,25 +1140,12 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 4. Deskripsi
+                  // 3. Deskripsi
                   TextField(
                     controller: descController,
                     maxLines: 2,
                     decoration: const InputDecoration(
                       labelText: 'Deskripsi (Default)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 5. Kode Room (Template)
-                  TextField(
-                    controller: roomCodeController,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      labelText: 'Kode Room Default (Opsional)',
-                      hintText: 'Contoh: NGAJI01',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -1072,7 +1175,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                     orgId: widget.orgId,
                                     title: titleController.text,
                                     description: descController.text,
-                                    location: locationController.text,
+                                    location:
+                                        null, // Lokasi diisi saat membuat room
                                     targetAudience:
                                         selectedTargetKriteriaId != null
                                         ? _targetList
@@ -1084,9 +1188,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                               .namaTarget
                                         : null,
                                     targetKriteriaId: selectedTargetKriteriaId,
-                                    roomCode: roomCodeController.text
-                                        .trim()
-                                        .toUpperCase(),
+                                    roomCode:
+                                        null, // Kode room diisi saat membuat room
                                     startedAt: template.startedAt,
                                     isTemplate: true,
                                     templateName: titleController.text,
@@ -1100,7 +1203,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                     orgId: widget.orgId,
                                     title: titleController.text,
                                     description: descController.text,
-                                    location: locationController.text,
+                                    location:
+                                        null, // Lokasi diisi saat membuat room
                                     targetAudience:
                                         selectedTargetKriteriaId != null
                                         ? _targetList
@@ -1112,9 +1216,8 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                                               .namaTarget
                                         : null,
                                     targetKriteriaId: selectedTargetKriteriaId,
-                                    roomCode: roomCodeController.text
-                                        .trim()
-                                        .toUpperCase(),
+                                    roomCode:
+                                        null, // Kode room diisi saat membuat room
                                     startedAt: DateTime.now(),
                                     isTemplate: true,
                                     templateName: titleController.text,

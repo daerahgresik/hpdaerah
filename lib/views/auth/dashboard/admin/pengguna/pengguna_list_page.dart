@@ -324,27 +324,63 @@ class _PenggunaListPageState extends State<PenggunaListPage>
     }
   }
 
-  // Get user's organization hierarchy from current_org_id
+  // Get user's organization hierarchy - combine explicit fields + tracing for complete picture
   Map<String, String?> _getUserOrgHierarchy(Map<String, dynamic> user) {
-    final currentOrgId = user['current_org_id'] as String?;
-    if (currentOrgId == null) return {};
-
-    // Find the user's current org
-    final currentOrg = _organisations.firstWhere(
-      (o) => o['id'] == currentOrgId,
-      orElse: () => {},
-    );
-    if (currentOrg.isEmpty) return {};
-
-    // Build hierarchy - trace up to find daerah, desa, kelompok
     Map<String, String?> hierarchy = {};
 
+    // STEP 1: Use explicit hierarchy fields (saved during registration)
+    if (user['org_daerah_id'] != null) {
+      hierarchy['daerah'] = user['org_daerah_id'] as String?;
+    }
+    if (user['org_desa_id'] != null) {
+      hierarchy['desa'] = user['org_desa_id'] as String?;
+    }
+    if (user['org_kelompok_id'] != null) {
+      hierarchy['kelompok'] = user['org_kelompok_id'] as String?;
+    }
+    if (user['org_kategori_id'] != null) {
+      hierarchy['kategori'] = user['org_kategori_id'] as String?;
+    }
+
+    // STEP 2: If hierarchy already complete (has daerah), return it
+    if (hierarchy.containsKey('daerah') && hierarchy['daerah'] != null) {
+      return hierarchy;
+    }
+
+    // STEP 3: Try to trace from admin_org_id for admin users if missing daerah
+    String? orgToTrace = user['current_org_id'] as String?;
+
+    // Also check admin_org_id as alternative source
+    if (orgToTrace == null && user['admin_org_id'] != null) {
+      orgToTrace = user['admin_org_id'] as String?;
+    }
+
+    if (orgToTrace == null) return hierarchy; // Return whatever we have
+
+    // Find the org and trace upward
+    final startOrg = _organisations.firstWhere(
+      (o) => o['id'] == orgToTrace,
+      orElse: () => {},
+    );
+    if (startOrg.isEmpty) return hierarchy;
+
+    // Trace up to find missing hierarchy levels
     void traceParent(Map<String, dynamic> org) {
       final level = org['level'] as int?;
-      if (level == 0) hierarchy['daerah'] = org['id'];
-      if (level == 1) hierarchy['desa'] = org['id'];
-      if (level == 2) hierarchy['kelompok'] = org['id'];
-      if (level == 3) hierarchy['kategori'] = org['id'];
+
+      // Only fill in if not already set
+      if (level == 0 && !hierarchy.containsKey('daerah')) {
+        hierarchy['daerah'] = org['id'];
+      }
+      if (level == 1 && !hierarchy.containsKey('desa')) {
+        hierarchy['desa'] = org['id'];
+      }
+      if (level == 2 && !hierarchy.containsKey('kelompok')) {
+        hierarchy['kelompok'] = org['id'];
+      }
+      if (level == 3 && !hierarchy.containsKey('kategori')) {
+        hierarchy['kategori'] = org['id'];
+      }
 
       final parentId = org['parent_id'] as String?;
       if (parentId != null) {
@@ -356,14 +392,7 @@ class _PenggunaListPageState extends State<PenggunaListPage>
       }
     }
 
-    traceParent(currentOrg);
-
-    // Also store current level
-    final currentLevel = currentOrg['level'] as int?;
-    if (currentLevel == 0) hierarchy['daerah'] = currentOrgId;
-    if (currentLevel == 1) hierarchy['desa'] = currentOrgId;
-    if (currentLevel == 2) hierarchy['kelompok'] = currentOrgId;
-    if (currentLevel == 3) hierarchy['kategori'] = currentOrgId;
+    traceParent(startOrg);
 
     return hierarchy;
   }
