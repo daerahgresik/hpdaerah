@@ -546,7 +546,10 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
 
             if (_showKhataman) ...[
               const SizedBox(height: 24),
-              const KhatamanPage(),
+              KhatamanPage(
+                user: widget.user,
+                orgId: _selectedOrgId ?? widget.orgId,
+              ),
             ],
 
             // INLINE ATUR KELAS

@@ -475,6 +475,19 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                     orgId: widget.orgId,
                     adminLevel: widget.adminLevel,
                     systemTargets: customTargets,
+                    onKriteriaCreated: () async {
+                      // Refresh kriteria list from database
+                      final refreshed = await _targetService
+                          .fetchAvailableTargets(
+                            orgId: widget.orgId,
+                            orgDaerahId: widget.user.orgDaerahId,
+                            orgDesaId: widget.user.orgDesaId,
+                            orgKelompokId: widget.user.orgKelompokId,
+                          );
+                      setStateDialog(() {
+                        customTargets = refreshed;
+                      });
+                    },
                     onSelectionChanged: (selection) {
                       setStateDialog(() {
                         // Update legacy fields for compatibility

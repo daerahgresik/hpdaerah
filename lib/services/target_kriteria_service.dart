@@ -65,6 +65,13 @@ class TargetKriteriaService {
     await _client.from('target_kriteria').insert(target.toJson());
   }
 
+  Future<void> updateTarget(TargetKriteria target) async {
+    await _client
+        .from('target_kriteria')
+        .update(target.toJson())
+        .eq('id', target.id);
+  }
+
   Future<void> deleteTarget(String id) async {
     await _client.from('target_kriteria').delete().eq('id', id);
   }

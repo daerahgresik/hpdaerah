@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:hpdaerah/services/presensi_service.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/roomaktif/coderoom.dart';
 
 /// Smart QR Code Tab - Strictly for Active QR Codes
 class QrCodeTab extends StatefulWidget {
@@ -93,11 +94,74 @@ class _QrCodeTabState extends State<QrCodeTab> {
 
   Widget _buildAktifTab(List<PengajianQr> aktifList) {
     if (aktifList.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.qr_code_scanner,
-        title: 'Tidak Ada QR Aktif',
-        subtitle:
-            'Semua pengajian sudah Anda hadiri atau belum ada pengajian baru',
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            // Empty state header
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.grey.shade100, Colors.grey.shade50],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.qr_code_scanner_rounded,
+                      size: 40,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Tidak Ada Pengajian Aktif",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Saat ini tidak ada pengajian yang menjadikan Anda sebagai target peserta.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Room code input card
+            RoomCodeInputCard(
+              user: widget.user,
+              onJoinSuccess: () {
+                // Refresh stream when user joins a room
+                if (mounted) {
+                  setState(() {
+                    _initStream();
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       );
     }
 

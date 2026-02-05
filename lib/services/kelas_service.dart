@@ -699,7 +699,7 @@ class KelasService {
         // Get kelas names for breakdown
         for (final kelasId in targetKelasIds) {
           final kelasData = await _client
-              .from('org_kategoris')
+              .from('kelas')
               .select('nama')
               .eq('id', kelasId)
               .maybeSingle();
@@ -717,7 +717,7 @@ class KelasService {
       } else if (targetMode == 'kriteria' && targetKriteriaId != null) {
         // Get kriteria details
         final kriteria = await _client
-            .from('target_kriterias')
+            .from('target_kriteria')
             .select()
             .eq('id', targetKriteriaId)
             .maybeSingle();

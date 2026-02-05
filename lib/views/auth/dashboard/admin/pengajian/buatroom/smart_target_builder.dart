@@ -338,7 +338,7 @@ class _SmartTargetBuilderState extends State<SmartTargetBuilder> {
               ),
             ),
             TextButton.icon(
-              onPressed: _showAddKriteriaDialog,
+              onPressed: () => _showAddKriteriaDialog(),
               icon: const Icon(Icons.add, size: 16),
               label: const Text("Buat Baru", style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
@@ -376,7 +376,7 @@ class _SmartTargetBuilderState extends State<SmartTargetBuilder> {
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
-                  onPressed: _showAddKriteriaDialog,
+                  onPressed: () => _showAddKriteriaDialog(),
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text("Buat Kriteria Pertama"),
                   style: ElevatedButton.styleFrom(
@@ -388,46 +388,421 @@ class _SmartTargetBuilderState extends State<SmartTargetBuilder> {
             ),
           )
         else
-          // Kriteria dropdown
+          // Kriteria list with actions
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey.shade300),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedKriteriaId,
-                isExpanded: true,
-                hint: const Text("Pilih Kriteria..."),
-                items: widget.systemTargets.map((t) {
-                  return DropdownMenuItem(
-                    value: t.id,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(t.namaTarget),
-                        Text(
-                          _buildKriteriaSubtitle(t),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
+            child: Column(
+              children: widget.systemTargets.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final t = entry.value;
+                final isSelected = _selectedKriteriaId == t.id;
+                final isLast = idx == widget.systemTargets.length - 1;
+
+                return Column(
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        setState(() => _selectedKriteriaId = t.id);
+                        _updateEstimate();
+                      },
+                      borderRadius: BorderRadius.vertical(
+                        top: idx == 0 ? const Radius.circular(12) : Radius.zero,
+                        bottom: isLast
+                            ? const Radius.circular(12)
+                            : Radius.zero,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF1A5F2D).withValues(alpha: 0.1)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.vertical(
+                            top: idx == 0
+                                ? const Radius.circular(12)
+                                : Radius.zero,
+                            bottom: isLast
+                                ? const Radius.circular(12)
+                                : Radius.zero,
                           ),
                         ),
-                      ],
+                        child: Row(
+                          children: [
+                            // Radio indicator
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF1A5F2D)
+                                      : Colors.grey.shade400,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? Center(
+                                      child: Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Color(0xFF1A5F2D),
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            // Content
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t.namaTarget,
+                                    style: TextStyle(
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: isSelected
+                                          ? const Color(0xFF1A5F2D)
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                  Text(
+                                    _buildKriteriaSubtitle(t),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Action buttons
+                            IconButton(
+                              icon: Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: Colors.blue[600],
+                              ),
+                              onPressed: () => _showKriteriaDetailDialog(t),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: "Lihat Detail",
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.edit_outlined,
+                                size: 18,
+                                color: Colors.orange[700],
+                              ),
+                              onPressed: () => _showEditKriteriaDialog(t),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: "Edit",
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Colors.red[600],
+                              ),
+                              onPressed: () => _confirmDeleteKriteria(t),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              tooltip: "Hapus",
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  setState(() => _selectedKriteriaId = val);
-                  _updateEstimate();
-                },
-              ),
+                    if (!isLast)
+                      Divider(height: 1, color: Colors.grey.shade200),
+                  ],
+                );
+              }).toList(),
             ),
           ),
       ],
+    );
+  }
+
+  void _showKriteriaDetailDialog(TargetKriteria t) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A5F2D).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.filter_list,
+                color: Color(0xFF1A5F2D),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(t.namaTarget)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow("Umur", "${t.minUmur} - ${t.maxUmur} tahun"),
+            _buildDetailRow("Jenis Kelamin", t.jenisKelamin),
+            _buildDetailRow("Status Warga", t.statusWarga),
+            _buildDetailRow("Keperluan", t.keperluan),
+            _buildDetailRow("Status Pernikahan", t.statusPernikahan),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Tutup"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[600])),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  void _showEditKriteriaDialog(TargetKriteria t) {
+    final namaController = TextEditingController(text: t.namaTarget);
+    int minUmur = t.minUmur;
+    int maxUmur = t.maxUmur;
+    String jenisKelamin = t.jenisKelamin;
+    String statusWarga = t.statusWarga;
+    String keperluan = t.keperluan;
+    String statusPernikahan = t.statusPernikahan;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: const Text('Edit Kriteria'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: namaController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Kriteria',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Range Umur",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          controller: TextEditingController(
+                            text: minUmur.toString(),
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Min',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (val) => minUmur = int.tryParse(val) ?? 0,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          controller: TextEditingController(
+                            text: maxUmur.toString(),
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Max',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (val) =>
+                              maxUmur = int.tryParse(val) ?? 100,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: jenisKelamin,
+                    decoration: const InputDecoration(
+                      labelText: 'Jenis Kelamin',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: ['Semua', 'Laki-laki', 'Perempuan']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setStateDialog(() => jenisKelamin = val ?? 'Semua'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: statusWarga,
+                    decoration: const InputDecoration(
+                      labelText: 'Status Warga',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: ['Semua', 'Aktif', 'Tidak Aktif']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setStateDialog(() => statusWarga = val ?? 'Semua'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: keperluan,
+                    decoration: const InputDecoration(
+                      labelText: 'Keperluan',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: ['Semua', 'Menetap', 'Merantau']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setStateDialog(() => keperluan = val ?? 'Semua'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: statusPernikahan,
+                    decoration: const InputDecoration(
+                      labelText: 'Status Pernikahan',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: ['Semua', 'Menikah', 'Belum Menikah', 'Duda/Janda']
+                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setStateDialog(() => statusPernikahan = val ?? 'Semua'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (namaController.text.isEmpty) return;
+
+                  final updated = TargetKriteria(
+                    id: t.id,
+                    orgId: t.orgId,
+                    namaTarget: namaController.text,
+                    minUmur: minUmur,
+                    maxUmur: maxUmur,
+                    jenisKelamin: jenisKelamin,
+                    statusWarga: statusWarga,
+                    keperluan: keperluan,
+                    statusPernikahan: statusPernikahan,
+                  );
+
+                  await _targetService.updateTarget(updated);
+                  Navigator.pop(ctx);
+                  widget.onKriteriaCreated?.call();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A5F2D),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Simpan'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _confirmDeleteKriteria(TargetKriteria t) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Hapus Kriteria?'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus kriteria "${t.namaTarget}"? Tindakan ini tidak dapat dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _targetService.deleteTarget(t.id);
+              Navigator.pop(ctx);
+              widget.onKriteriaCreated?.call();
+              if (_selectedKriteriaId == t.id) {
+                setState(() => _selectedKriteriaId = null);
+                _updateEstimate();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -606,10 +981,12 @@ class _SmartTargetBuilderState extends State<SmartTargetBuilder> {
   String _buildKriteriaSubtitle(TargetKriteria k) {
     final parts = <String>[];
     if (k.minUmur > 0 || k.maxUmur < 100) {
-      parts.add("${k.minUmur}-${k.maxUmur} tahun");
+      parts.add("${k.minUmur}-${k.maxUmur} thn");
     }
     if (k.jenisKelamin != 'Semua') parts.add(k.jenisKelamin);
+    if (k.statusWarga != 'Semua') parts.add(k.statusWarga);
     if (k.keperluan != 'Semua') parts.add(k.keperluan);
+    if (k.statusPernikahan != 'Semua') parts.add(k.statusPernikahan);
     return parts.isEmpty ? "Semua anggota" : parts.join(" • ");
   }
 
