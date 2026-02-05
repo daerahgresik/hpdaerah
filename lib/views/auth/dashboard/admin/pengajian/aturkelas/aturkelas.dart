@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/kelas_model.dart';
+import 'package:hpdaerah/models/aggregated_kelas_model.dart';
 import 'package:hpdaerah/models/organization_model.dart';
 import 'package:hpdaerah/services/kelas_service.dart';
 import 'package:hpdaerah/services/organization_service.dart';
+
+/// View Mode untuk admin level tinggi
+enum ViewMode { overview, specific }
 
 class AturKelasPage extends StatefulWidget {
   final UserModel user;
@@ -19,12 +23,26 @@ class _AturKelasPageState extends State<AturKelasPage> {
   final _kelasService = KelasService();
   final _orgService = OrganizationService();
 
-  // State
+  // State - Common
+  bool _isLoading = true;
+  int get _adminLevel => widget.user.adminLevel ?? 4;
+
+  // State - View Mode (for admin level <= 2)
+  ViewMode _viewMode = ViewMode.overview;
+
+  // State - Overview Mode
+  List<AggregatedKelas> _aggregatedKelas = [];
+  HierarchyStats _stats = HierarchyStats.empty();
+  List<Map<String, dynamic>> _desaFilter = [];
+  List<Map<String, dynamic>> _kelompokFilter = [];
+  String? _filterDesaId;
+  Set<String> _expandedCards = {};
+
+  // State - Specific Mode (per kelompok)
   List<Kelas> _kelasList = [];
   List<Organization> _desaList = [];
   List<Organization> _kelompokList = [];
   List<Map<String, dynamic>> _unassignedUsers = [];
-  bool _isLoading = true;
   String? _selectedDesaId;
   String? _selectedKelompokId;
   Map<String, int> _memberCounts = {};
@@ -36,29 +54,76 @@ class _AturKelasPageState extends State<AturKelasPage> {
   }
 
   Future<void> _loadInitialData() async {
-    final adminLevel = widget.user.adminLevel ?? 4;
-
-    if (adminLevel == 3) {
-      // Admin Kelompok - langsung load kelas
+    if (_adminLevel == 3) {
+      // Admin Kelompok - langsung load kelas, tidak ada toggle mode
       _selectedKelompokId = widget.orgId;
       await _loadKelas();
-    } else if (adminLevel <= 2) {
-      // Admin Daerah atau Desa - perlu pilih kelompok dulu
-      await _loadDesaList();
+    } else if (_adminLevel <= 2) {
+      // Admin Desa/Daerah - default Overview Mode
+      await _loadOverviewData();
+      await _loadFilters();
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  Future<void> _loadDesaList() async {
-    final adminLevel = widget.user.adminLevel ?? 4;
+  // ==================== OVERVIEW MODE METHODS ====================
 
-    if (adminLevel == 1) {
-      // Admin Daerah - load semua desa
+  Future<void> _loadOverviewData() async {
+    try {
+      _aggregatedKelas = await _kelasService.fetchAggregatedKelas(
+        orgId: widget.orgId,
+        adminLevel: _adminLevel,
+        filterDesaId: _filterDesaId,
+      );
+      _stats = await _kelasService.getHierarchyStats(
+        orgId: widget.orgId,
+        adminLevel: _adminLevel,
+        filterDesaId: _filterDesaId,
+      );
+    } catch (e) {
+      debugPrint("Error loading overview: $e");
+    }
+  }
+
+  Future<void> _loadFilters() async {
+    try {
+      if (_adminLevel == 1) {
+        _desaFilter = await _kelasService.getDesaListForFilter(widget.orgId);
+      }
+      _kelompokFilter = await _kelasService.getKelompokListForFilter(
+        orgId: widget.orgId,
+        adminLevel: _adminLevel,
+        filterDesaId: _filterDesaId,
+      );
+    } catch (e) {
+      debugPrint("Error loading filters: $e");
+    }
+  }
+
+  void _onDesaFilterChanged(String? desaId) async {
+    setState(() {
+      _filterDesaId = desaId;
+      _isLoading = true;
+    });
+
+    await _loadOverviewData();
+    _kelompokFilter = await _kelasService.getKelompokListForFilter(
+      orgId: widget.orgId,
+      adminLevel: _adminLevel,
+      filterDesaId: _filterDesaId,
+    );
+
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ==================== SPECIFIC MODE METHODS ====================
+
+  Future<void> _loadDesaList() async {
+    if (_adminLevel == 1) {
       final children = await _orgService.fetchChildren(widget.orgId);
       _desaList = children.where((o) => o.level == 1).toList();
-    } else if (adminLevel == 2) {
-      // Admin Desa - auto-select desa mereka
+    } else if (_adminLevel == 2) {
       _selectedDesaId = widget.orgId;
       await _loadKelompokList(_selectedDesaId!);
     }
@@ -93,42 +158,57 @@ class _AturKelasPageState extends State<AturKelasPage> {
       debugPrint("Error loading kelas: $e");
     }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+    if (mounted) setState(() => _isLoading = false);
   }
+
+  void _switchToOverview() async {
+    setState(() {
+      _viewMode = ViewMode.overview;
+      _isLoading = true;
+    });
+
+    await _loadOverviewData();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  void _switchToSpecific() async {
+    setState(() {
+      _viewMode = ViewMode.specific;
+      _isLoading = true;
+    });
+
+    await _loadDesaList();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ==================== BUILD METHODS ====================
 
   @override
   Widget build(BuildContext context) {
-    final adminLevel = widget.user.adminLevel ?? 4;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         _buildHeader(),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // Cascading Dropdowns (untuk admin level atas)
-        if (adminLevel <= 2) ...[
-          _buildScopeSelectors(),
+        // Mode Toggle untuk admin level tinggi
+        if (_adminLevel <= 2) ...[
+          _buildModeToggle(),
           const SizedBox(height: 16),
         ],
 
-        if (_unassignedUsers.isNotEmpty) ...[
-          _buildUnassignedBanner(),
-          const SizedBox(height: 16),
-        ],
-
-        // Content
+        // Content berdasarkan mode
         if (_isLoading)
-          const Center(child: CircularProgressIndicator())
-        else if (_selectedKelompokId == null)
-          _buildEmptyState("Pilih Kelompok untuk melihat daftar kelas")
-        else if (_kelasList.isEmpty && _unassignedUsers.isEmpty)
-          _buildEmptyState("Belum ada kelas di kelompok ini")
-        else if (_kelasList.isNotEmpty)
-          _buildKelasList(),
+          const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_adminLevel == 3)
+          _buildSpecificContent()
+        else if (_viewMode == ViewMode.overview)
+          _buildOverviewContent()
+        else
+          _buildSpecificContent(),
       ],
     );
   }
@@ -158,17 +238,20 @@ class _AturKelasPageState extends State<AturKelasPage> {
                 ),
               ),
               Text(
-                "Kelola kelas pengajian per kelompok",
+                _adminLevel == 3
+                    ? "Kelola kelas pengajian"
+                    : "Lihat & kelola kelas di seluruh wilayah",
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
         ),
-        if (_selectedKelompokId != null)
+        // Tombol tambah kelas
+        if (_viewMode == ViewMode.specific && _selectedKelompokId != null)
           ElevatedButton.icon(
             onPressed: () => _showAddEditDialog(),
             icon: const Icon(Icons.add, size: 18),
-            label: const Text("Tambah Kelas"),
+            label: const Text("Tambah"),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
@@ -177,14 +260,510 @@ class _AturKelasPageState extends State<AturKelasPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
+          )
+        else if (_viewMode == ViewMode.overview && _adminLevel <= 2)
+          _buildOverviewAddButton(),
+      ],
+    );
+  }
+
+  Widget _buildOverviewAddButton() {
+    return PopupMenuButton<String>(
+      onSelected: (kelompokId) {
+        setState(() {
+          _selectedKelompokId = kelompokId;
+          _viewMode = ViewMode.specific;
+        });
+        _loadKelas().then((_) => _showAddEditDialog());
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.teal,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add, size: 18, color: Colors.white),
+            SizedBox(width: 6),
+            Text(
+              "Tambah",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (context) {
+        return _kelompokFilter.map((k) {
+          return PopupMenuItem<String>(
+            value: k['id'] as String,
+            child: Text(k['name'] as String),
+          );
+        }).toList();
+      },
+    );
+  }
+
+  Widget _buildModeToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ModeToggleButton(
+              label: "Overview",
+              icon: Icons.dashboard_rounded,
+              isSelected: _viewMode == ViewMode.overview,
+              onTap: _switchToOverview,
+            ),
           ),
+          Expanded(
+            child: _ModeToggleButton(
+              label: "Per Kelompok",
+              icon: Icons.list_alt_rounded,
+              isSelected: _viewMode == ViewMode.specific,
+              onTap: _switchToSpecific,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== OVERVIEW MODE CONTENT ====================
+
+  Widget _buildOverviewContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Stats Header
+        _buildStatsHeader(),
+        const SizedBox(height: 16),
+
+        // Filters
+        if (_adminLevel == 1) ...[
+          _buildDesaFilter(),
+          const SizedBox(height: 12),
+        ],
+
+        // Aggregated Kelas List
+        if (_aggregatedKelas.isEmpty)
+          _buildEmptyState("Belum ada kelas di wilayah ini")
+        else
+          ..._aggregatedKelas.map((ak) => _buildAggregatedCard(ak)),
+
+        // Unassigned warning
+        if (_stats.unassignedCount > 0) ...[
+          const SizedBox(height: 16),
+          _buildUnassignedOverviewBanner(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStatsHeader() {
+    final parts = <String>[];
+    if (_adminLevel == 1 && _stats.desaCount > 0) {
+      parts.add("${_stats.desaCount} desa");
+    }
+    if (_stats.kelompokCount > 0) {
+      parts.add("${_stats.kelompokCount} kelompok");
+    }
+    if (_stats.uniqueClassCount > 0) {
+      parts.add("${_stats.uniqueClassCount} kelas");
+    }
+    if (_stats.totalMembers > 0) {
+      parts.add("${_stats.totalMembers} anggota");
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.teal.shade400, Colors.teal.shade600],
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.analytics, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Ringkasan Kelas",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  parts.join(" • "),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesaFilter() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        FilterChip(
+          label: const Text("Semua Desa"),
+          selected: _filterDesaId == null,
+          onSelected: (_) => _onDesaFilterChanged(null),
+          selectedColor: Colors.teal.withValues(alpha: 0.2),
+          checkmarkColor: Colors.teal,
+        ),
+        ..._desaFilter.map((desa) {
+          final isSelected = _filterDesaId == desa['id'];
+          return FilterChip(
+            label: Text(desa['name'] as String),
+            selected: isSelected,
+            onSelected: (_) => _onDesaFilterChanged(desa['id'] as String),
+            selectedColor: Colors.teal.withValues(alpha: 0.2),
+            checkmarkColor: Colors.teal,
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildAggregatedCard(AggregatedKelas ak) {
+    final isExpanded = _expandedCards.contains(ak.normalizedName);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          // Header - Tap to expand
+          InkWell(
+            onTap: () {
+              setState(() {
+                if (isExpanded) {
+                  _expandedCards.remove(ak.normalizedName);
+                } else {
+                  _expandedCards.add(ak.normalizedName);
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.groups_rounded, color: Colors.teal),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ak.displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _StatBadge(
+                              icon: Icons.people,
+                              label: "${ak.totalMembers} anggota",
+                              color: Colors.blue,
+                            ),
+                            const SizedBox(width: 8),
+                            if (ak.kelompokCount > 1)
+                              _StatBadge(
+                                icon: Icons.location_on,
+                                label: "${ak.kelompokCount} kelompok",
+                                color: Colors.orange,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.expand_more, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Breakdown items
+          if (isExpanded) ...[
+            const Divider(height: 1),
+            ...ak.breakdown.map((b) => _buildBreakdownItem(b)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownItem(KelasBreakdown breakdown) {
+    return InkWell(
+      onTap: () {
+        // Navigate to specific kelompok view
+        setState(() {
+          _selectedKelompokId = breakdown.kelompokId;
+          _viewMode = ViewMode.specific;
+        });
+        _loadKelas();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            const SizedBox(width: 24),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.teal.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    breakdown.kelompokName,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  if (breakdown.desaName != null)
+                    Text(
+                      breakdown.desaName!,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                "${breakdown.memberCount} anggota",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.blue[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 20),
+              onSelected: (action) async {
+                if (action == 'edit') {
+                  // Load kelas then show edit dialog
+                  final kelas = await _kelasService.fetchKelasByKelompok(
+                    breakdown.kelompokId,
+                  );
+                  final target = kelas.firstWhere(
+                    (k) => k.id == breakdown.kelasId,
+                    orElse: () => kelas.first,
+                  );
+                  _selectedKelompokId = breakdown.kelompokId;
+                  await _loadKelas();
+                  if (mounted) _showAddEditDialog(kelas: target);
+                } else if (action == 'delete') {
+                  _confirmDeleteFromBreakdown(breakdown);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Hapus', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteFromBreakdown(KelasBreakdown breakdown) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Hapus Kelas?"),
+        content: Text(
+          "Yakin ingin menghapus kelas \"${breakdown.kelasName}\" "
+          "dari ${breakdown.kelompokName}?\n\n"
+          "Anggota kelas ini akan menjadi tidak memiliki kelas.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _kelasService.deleteKelas(breakdown.kelasId);
+                if (context.mounted) {
+                  Navigator.pop(ctx);
+                  await _loadOverviewData();
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Kelas berhasil dihapus"),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Error: $e"),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Hapus"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnassignedOverviewBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange[800]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "${_stats.unassignedCount} Anggota Belum Memiliki Kelas",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[900],
+                  ),
+                ),
+                Text(
+                  "Pilih kelompok untuk mengaturnya.",
+                  style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SPECIFIC MODE CONTENT ====================
+
+  Widget _buildSpecificContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Scope selectors untuk admin daerah/desa
+        if (_adminLevel <= 2 && _viewMode == ViewMode.specific) ...[
+          _buildScopeSelectors(),
+          const SizedBox(height: 16),
+        ],
+
+        // Unassigned banner
+        if (_unassignedUsers.isNotEmpty) ...[
+          _buildUnassignedBanner(),
+          const SizedBox(height: 16),
+        ],
+
+        // Content
+        if (_selectedKelompokId == null)
+          _buildEmptyState("Pilih Kelompok untuk melihat daftar kelas")
+        else if (_kelasList.isEmpty && _unassignedUsers.isEmpty)
+          _buildEmptyState("Belum ada kelas di kelompok ini")
+        else if (_kelasList.isNotEmpty)
+          _buildKelasList(),
       ],
     );
   }
 
   Widget _buildScopeSelectors() {
-    final adminLevel = widget.user.adminLevel ?? 4;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -202,7 +781,7 @@ class _AturKelasPageState extends State<AturKelasPage> {
           const SizedBox(height: 12),
 
           // Dropdown Desa (untuk Admin Daerah)
-          if (adminLevel == 1) ...[
+          if (_adminLevel == 1) ...[
             DropdownButtonFormField<String>(
               value: _selectedDesaId,
               hint: const Text("Pilih Desa"),
@@ -318,7 +897,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  // Icon
                   Container(
                     width: 48,
                     height: 48,
@@ -329,8 +907,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
                     child: const Icon(Icons.groups_rounded, color: Colors.teal),
                   ),
                   const SizedBox(width: 16),
-
-                  // Info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,29 +929,14 @@ class _AturKelasPageState extends State<AturKelasPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            "$count anggota",
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.blue[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                        _StatBadge(
+                          icon: Icons.people,
+                          label: "$count anggota",
+                          color: Colors.blue,
                         ),
                       ],
                     ),
                   ),
-
-                  // Actions
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert),
                     onSelected: (action) {
@@ -416,6 +977,8 @@ class _AturKelasPageState extends State<AturKelasPage> {
       },
     );
   }
+
+  // ==================== DIALOGS ====================
 
   void _showAddEditDialog({Kelas? kelas}) {
     final isEdit = kelas != null;
@@ -544,7 +1107,8 @@ class _AturKelasPageState extends State<AturKelasPage> {
       builder: (ctx) => AlertDialog(
         title: const Text("Hapus Kelas?"),
         content: Text(
-          "Yakin ingin menghapus kelas \"${kelas.nama}\"?\n\nAnggota kelas ini akan menjadi tidak memiliki kelas.",
+          "Yakin ingin menghapus kelas \"${kelas.nama}\"?\n\n"
+          "Anggota kelas ini akan menjadi tidak memiliki kelas.",
         ),
         actions: [
           TextButton(
@@ -601,7 +1165,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
         expand: false,
         builder: (context, scrollController) => Column(
           children: [
-            // Handle
             Container(
               margin: const EdgeInsets.symmetric(vertical: 12),
               width: 40,
@@ -611,7 +1174,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -651,7 +1213,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
               ),
             ),
             const Divider(height: 24),
-            // Members List
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
                 future: _kelasService.getKelasMembers(kelas.id),
@@ -761,7 +1322,7 @@ class _AturKelasPageState extends State<AturKelasPage> {
                         if (context.mounted) {
                           Navigator.pop(ctx);
                           if (closeParentSheet) {
-                            Navigator.pop(context); // Close bottom sheet
+                            Navigator.pop(context);
                           }
                           _loadKelas();
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -856,7 +1417,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
             ),
             child: Column(
               children: [
-                // Handle
                 Container(
                   margin: const EdgeInsets.only(top: 12),
                   width: 40,
@@ -919,13 +1479,13 @@ class _AturKelasPageState extends State<AturKelasPage> {
                         subtitle: Text("@${u['username'] ?? '-'}"),
                         trailing: ElevatedButton(
                           onPressed: () {
-                            Navigator.pop(context); // close sheet
+                            Navigator.pop(context);
                             _showMoveUserDialog(
                               u['id'],
                               u['nama'],
                               'unassigned',
                               closeParentSheet: false,
-                            ); // reuse dialog
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.teal,
@@ -942,6 +1502,93 @@ class _AturKelasPageState extends State<AturKelasPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ==================== HELPER WIDGETS ====================
+
+class _ModeToggleButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModeToggleButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.teal : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey[600],
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

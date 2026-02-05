@@ -17,7 +17,9 @@
   final String? orgKelompokId;
   final List<String>? materiGuru;
   final String? materiIsi;
-  final String? targetKriteriaId; // New
+  final String? targetKriteriaId;
+  final List<String>? targetKelasIds; // NEW: Target kelas spesifik
+  final String? targetMode; // NEW: 'all' | 'kelas' | 'kriteria'
 
   Pengajian({
     required this.id,
@@ -39,6 +41,8 @@
     this.materiGuru,
     this.materiIsi,
     this.targetKriteriaId,
+    this.targetKelasIds,
+    this.targetMode,
   });
 
   factory Pengajian.fromJson(Map<String, dynamic> json) {
@@ -66,6 +70,10 @@
           .toList(),
       materiIsi: json['materi_isi'] as String?,
       targetKriteriaId: json['target_kriteria_id'] as String?,
+      targetKelasIds: (json['target_kelas_ids'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      targetMode: json['target_mode'] as String?,
     );
   }
 
@@ -90,6 +98,8 @@
       'materi_guru': materiGuru,
       'materi_isi': materiIsi,
       'target_kriteria_id': targetKriteriaId,
+      'target_kelas_ids': targetKelasIds,
+      'target_mode': targetMode,
     };
   }
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
@@ -6,6 +6,7 @@ import 'package:hpdaerah/services/organization_service.dart';
 import 'package:hpdaerah/models/organization_model.dart';
 import 'package:hpdaerah/services/target_kriteria_service.dart';
 import 'package:hpdaerah/models/target_kriteria_model.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/buatroom/smart_target_builder.dart';
 
 class PengajianLevelSelector extends StatefulWidget {
   final UserModel user;
@@ -28,11 +29,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
   final _orgService = OrganizationService();
   final _targetService = TargetKriteriaService();
   late Stream<List<Pengajian>> _templatesStream;
-
-  // Inline Management State
-  bool _isTargetExpanded = false;
   List<TargetKriteria> _targetList = [];
-  bool _isLoadingTargets = false;
 
   @override
   void initState() {
@@ -42,16 +39,12 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
   }
 
   Future<void> _fetchTargets() async {
-    if (mounted) setState(() => _isLoadingTargets = true);
     final list = await _targetService.fetchAllTargetsInHierarchy(
       orgId: widget.orgId,
       adminLevel: widget.user.adminLevel ?? 4,
     );
     if (mounted) {
-      setState(() {
-        _targetList = list;
-        _isLoadingTargets = false;
-      });
+      setState(() => _targetList = list);
     }
   }
 
@@ -93,10 +86,6 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
 
         return Column(
           children: [
-            // 0. KELOLA TARGET PESERTA (INLINE)
-            _buildInlineTargetManager(),
-            const SizedBox(height: 12),
-
             // 1. DAERAH (Hanya muncul untuk Super Admin dan Admin Daerah)
             if (widget.adminLevel <= 1) ...[
               _buildSection(
@@ -355,7 +344,7 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
     }
 
     // Sub-organization selection - CASCADING DROPDOWNS
-    // For Kelompok level template, we need: Desa dropdown → Kelompok dropdown
+    // For Kelompok level template, we need: Desa dropdown ? Kelompok dropdown
     String? selectedDesaId;
     String? selectedKelompokId;
     List<Organization> desaList = [];
@@ -476,49 +465,34 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 1. SELECT TARGET AUDIENCE
+                  // 1. SELECT TARGET AUDIENCE - SMART TARGET BUILDER
                   const Text(
                     "Target Peserta:",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedAudience,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
-                    ),
-                    items: audienceOptions
-                        .map(
-                          (val) => DropdownMenuItem<String>(
-                            value: val,
-                            child: Text(val),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setStateDialog(() {
-                          selectedAudience = val;
-                          // Update the ID find the matching target
-                          if (val == 'Semua') {
-                            selectedTargetKriteriaId = null;
-                          } else {
+                  SmartTargetBuilder(
+                    orgId: widget.orgId,
+                    adminLevel: widget.adminLevel,
+                    systemTargets: customTargets,
+                    onSelectionChanged: (selection) {
+                      setStateDialog(() {
+                        // Update legacy fields for compatibility
+                        if (selection.mode == TargetMode.kriteria) {
+                          selectedTargetKriteriaId = selection.kriteriaId;
+                          if (selection.kriteriaId != null) {
                             final match = customTargets.firstWhere(
-                              (t) => t.namaTarget == val,
+                              (t) => t.id == selection.kriteriaId,
                             );
-                            selectedTargetKriteriaId = match.id;
+                            selectedAudience = match.namaTarget;
                           }
-                        });
-                      }
+                        } else {
+                          selectedTargetKriteriaId = null;
+                          selectedAudience = selection.mode == TargetMode.all
+                              ? 'Semua'
+                              : 'Kelas Tertentu';
+                        }
+                      });
                     },
                   ),
                   const SizedBox(height: 16),
@@ -914,156 +888,574 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
                 child: const Text('Batal'),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  try {
-                    final combinedStartTime = DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      selectedTime.hour,
-                      selectedTime.minute,
-                    );
-
-                    final combinedEndTime = DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      selectedEndTime.hour,
-                      selectedEndTime.minute,
-                    );
-
-                    // Hierarchical context resolution:
-                    // Resolve the final target org based on cascading selection
-                    String? orgDaerahId = widget.user.orgDaerahId;
-                    String? orgDesaId = widget.user.orgDesaId;
-                    String? orgKelompokId = widget.user.orgKelompokId;
-
-                    // Super Admin / Cross-level support:
-                    // If we are acting as a specific level, ensure that level's ID is set
-                    if (widget.user.adminLevel == 1) {
-                      orgDaerahId ??= widget.user.adminOrgId;
-                    }
-                    if (widget.user.adminLevel == 2) {
-                      orgDesaId ??= widget.user.adminOrgId;
-                    }
-                    if (widget.user.adminLevel == 3) {
-                      orgKelompokId ??= widget.user.adminOrgId;
-                    }
-
-                    // Apply cascading selection
-                    if (selectedDesaId != null) {
-                      orgDesaId = selectedDesaId;
-                      // Find parent Daerah from desaList
-                      final selectedDesa = desaList.firstWhere(
-                        (o) => o.id == selectedDesaId,
-                        orElse: () =>
-                            Organization(id: '', name: '', type: 'desa'),
-                      );
-                      if (selectedDesa.parentId != null) {
-                        orgDaerahId = selectedDesa.parentId;
-                      }
-                    }
-                    if (selectedKelompokId != null) {
-                      orgKelompokId = selectedKelompokId;
-                      // Desa already set above, no need to update
-                    }
-
-                    // Determine the final targetOrgId based on template level
-                    String targetOrgId;
-                    if (templateLevel == 2 && selectedKelompokId != null) {
-                      // Kelompok level - use selected Kelompok
-                      targetOrgId = selectedKelompokId!;
-                    } else if (templateLevel == 1 && selectedDesaId != null) {
-                      // Desa level - use selected Desa
-                      targetOrgId = selectedDesaId!;
-                    } else {
-                      // Daerah level or no selection - use widget.orgId
-                      targetOrgId = widget.orgId;
-                    }
-
-                    // 2. Consolidate Materi (Jika diisi)
-                    final List<String> guruNames = [];
-                    final List<String> contentParts = [];
-
-                    for (var entry in materiEntries) {
-                      final name = entry['guru']?.text.trim() ?? '';
-                      final content = entry['isi']?.text.trim() ?? '';
-
-                      if (name.isNotEmpty) guruNames.add(name);
-                      if (content.isNotEmpty) contentParts.add(content);
-                    }
-
-                    // 3. Buat Pengajian (Termasuk Materi)
-                    await _pengajianService.createPengajian(
-                      Pengajian(
-                        id: '',
-                        orgId: targetOrgId,
-                        title: titleController.text,
-                        description: descriptionController.text,
-                        location: locationController.text,
-                        targetAudience: selectedAudience,
-                        roomCode: roomCodeController.text.trim().toUpperCase(),
-                        isTemplate: false,
-                        startedAt: combinedStartTime,
-                        endedAt: combinedEndTime,
-                        level: template.level,
-                        orgDaerahId: orgDaerahId,
-                        orgDesaId: orgDesaId,
-                        orgKelompokId: orgKelompokId,
-                        materiGuru: guruNames.isNotEmpty ? guruNames : null,
-                        materiIsi: contentParts.isNotEmpty
-                            ? contentParts.join(", ")
-                            : null,
-                        targetKriteriaId: selectedTargetKriteriaId,
-                      ),
-                    );
-
-                    if (context.mounted) {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.white),
-                              SizedBox(width: 12),
-                              Text('Pengajian & Materi berhasil dibuat!'),
-                            ],
-                          ),
-                          backgroundColor: Color(0xFF1A5F2D),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      // Tutup dialog dulu agar error SnackBar terlihat di depan
-                      Navigator.pop(ctx);
-
-                      String msg = e.toString();
-                      if (msg.startsWith('Exception: ')) {
-                        msg = msg.replaceFirst('Exception: ', '');
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(msg),
-                          backgroundColor: Colors.red[700],
-                          behavior: SnackBarBehavior.floating,
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
-                    }
-                  }
-                },
+                onPressed: () => _showPreviewAndConfirm(
+                  ctx,
+                  context,
+                  template,
+                  titleController,
+                  locationController,
+                  descriptionController,
+                  roomCodeController,
+                  selectedDate,
+                  selectedTime,
+                  selectedEndTime,
+                  selectedAudience,
+                  selectedTargetKriteriaId,
+                  customTargets,
+                  selectedDesaId,
+                  selectedKelompokId,
+                  desaList,
+                  materiEntries,
+                  templateLevel,
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A5F2D),
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                 ),
-                child: const Text('Konfirmasi & Buat'),
+                child: const Text('Buat'),
               ),
             ],
           );
         },
       ),
+    );
+  }
+
+  /// Show preview popup with pengajian summary, then confirm and send QR to targets
+  Future<void> _showPreviewAndConfirm(
+    BuildContext dialogCtx,
+    BuildContext parentContext,
+    Pengajian template,
+    TextEditingController titleController,
+    TextEditingController locationController,
+    TextEditingController descriptionController,
+    TextEditingController roomCodeController,
+    DateTime selectedDate,
+    TimeOfDay selectedTime,
+    TimeOfDay selectedEndTime,
+    String selectedAudience,
+    String? selectedTargetKriteriaId,
+    List<TargetKriteria> customTargets,
+    String? selectedDesaId,
+    String? selectedKelompokId,
+    List<Organization> desaList,
+    List<Map<String, TextEditingController>> materiEntries,
+    int templateLevel,
+  ) async {
+    // Format waktu
+    final startTimeStr =
+        '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+    final endTimeStr =
+        '${selectedEndTime.hour.toString().padLeft(2, '0')}:${selectedEndTime.minute.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}';
+
+    // Find target kriteria name
+    String targetName = selectedAudience;
+    if (selectedTargetKriteriaId != null) {
+      final kriteria = customTargets.firstWhere(
+        (k) => k.id == selectedTargetKriteriaId,
+        orElse: () =>
+            TargetKriteria(id: '', orgId: '', namaTarget: selectedAudience),
+      );
+      targetName = kriteria.namaTarget;
+    }
+
+    // Collect materi for preview
+    final List<String> materiList = [];
+    for (var entry in materiEntries) {
+      final guru = entry['guru']?.text.trim() ?? '';
+      final isi = entry['isi']?.text.trim() ?? '';
+      if (guru.isNotEmpty || isi.isNotEmpty) {
+        materiList.add(guru.isNotEmpty ? '$guru: $isi' : isi);
+      }
+    }
+
+    // Show preview dialog
+    final confirmed = await showDialog<bool>(
+      context: dialogCtx,
+      barrierDismissible: false,
+      builder: (previewCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1A5F2D), Color(0xFF2E7D32)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.preview, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text('Preview Pengajian'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Summary Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF1A5F2D).withOpacity(0.1),
+                      const Color(0xFF2E7D32).withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF1A5F2D).withOpacity(0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPreviewRow(
+                      Icons.title,
+                      'Judul',
+                      titleController.text,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPreviewRow(
+                      Icons.location_on,
+                      'Lokasi',
+                      locationController.text,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPreviewRow(Icons.calendar_today, 'Tanggal', dateStr),
+                    const SizedBox(height: 12),
+                    _buildPreviewRow(
+                      Icons.access_time,
+                      'Waktu',
+                      '$startTimeStr - $endTimeStr',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPreviewRow(Icons.groups, 'Target', targetName),
+                    if (roomCodeController.text.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildPreviewRow(
+                        Icons.qr_code,
+                        'Kode Room',
+                        roomCodeController.text.toUpperCase(),
+                      ),
+                    ],
+                    if (materiList.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildPreviewRow(
+                        Icons.book,
+                        'Materi',
+                        materiList.join('\n'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Info banner
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Setelah konfirmasi, QR akan otomatis dikirimkan ke semua peserta target.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(previewCtx, false),
+            child: const Text('Kembali'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(previewCtx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A5F2D),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.check_circle, size: 20),
+            label: const Text('Konfirmasi & Kirim QR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Show loading dialog with modern animation
+    if (!dialogCtx.mounted) return;
+
+    showDialog(
+      context: dialogCtx,
+      barrierDismissible: false,
+      builder: (loadingCtx) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Modern loading animation
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer pulse ring
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.8, end: 1.2),
+                    duration: const Duration(milliseconds: 1000),
+                    curve: Curves.easeInOut,
+                    builder: (context, value, child) {
+                      return Container(
+                        width: 100 * value,
+                        height: 100 * value,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(
+                              0xFF1A5F2D,
+                            ).withOpacity(0.3 / value),
+                            width: 3,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Inner container with icon
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF1A5F2D), Color(0xFF2E7D32)],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF1A5F2D).withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_2,
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Membuat Room & Mengirim QR',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A5F2D),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Mohon tunggu sebentar...',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 16),
+              // Progress indicator
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.grey.shade200,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF1A5F2D),
+                  ),
+                  minHeight: 6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Prepare dates
+      final combinedStartTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedTime.hour,
+        selectedTime.minute,
+      );
+      final combinedEndTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedEndTime.hour,
+        selectedEndTime.minute,
+      );
+
+      // Hierarchical context resolution
+      String? orgDaerahId = widget.user.orgDaerahId;
+      String? orgDesaId = widget.user.orgDesaId;
+      String? orgKelompokId = widget.user.orgKelompokId;
+
+      if (widget.user.adminLevel == 1) orgDaerahId ??= widget.user.adminOrgId;
+      if (widget.user.adminLevel == 2) orgDesaId ??= widget.user.adminOrgId;
+      if (widget.user.adminLevel == 3) orgKelompokId ??= widget.user.adminOrgId;
+
+      if (selectedDesaId != null) {
+        orgDesaId = selectedDesaId;
+        final selectedDesa = desaList.firstWhere(
+          (o) => o.id == selectedDesaId,
+          orElse: () => Organization(id: '', name: '', type: 'desa'),
+        );
+        if (selectedDesa.parentId != null) orgDaerahId = selectedDesa.parentId;
+      }
+      if (selectedKelompokId != null) orgKelompokId = selectedKelompokId;
+
+      // Determine target org
+      String targetOrgId;
+      if (templateLevel == 2 && selectedKelompokId != null) {
+        targetOrgId = selectedKelompokId!;
+      } else if (templateLevel == 1 && selectedDesaId != null) {
+        targetOrgId = selectedDesaId!;
+      } else {
+        targetOrgId = widget.orgId;
+      }
+
+      // Collect materi
+      List<String> guruNames = [];
+      List<String> contentParts = [];
+      for (var entry in materiEntries) {
+        final name = entry['guru']?.text.trim() ?? '';
+        final content = entry['isi']?.text.trim() ?? '';
+        if (name.isNotEmpty) guruNames.add(name);
+        if (content.isNotEmpty) contentParts.add(content);
+      }
+
+      // Create pengajian
+      await _pengajianService.createPengajian(
+        Pengajian(
+          id: '',
+          orgId: targetOrgId,
+          title: titleController.text,
+          description: descriptionController.text,
+          location: locationController.text,
+          targetAudience: selectedAudience,
+          roomCode: roomCodeController.text.trim().toUpperCase(),
+          isTemplate: false,
+          startedAt: combinedStartTime,
+          endedAt: combinedEndTime,
+          level: template.level,
+          orgDaerahId: orgDaerahId,
+          orgDesaId: orgDesaId,
+          orgKelompokId: orgKelompokId,
+          materiGuru: guruNames.isNotEmpty ? guruNames : null,
+          materiIsi: contentParts.isNotEmpty ? contentParts.join(", ") : null,
+          targetKriteriaId: selectedTargetKriteriaId,
+        ),
+      );
+
+      // Small delay for perceived progress
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Close loading and main dialogs
+      if (dialogCtx.mounted) {
+        Navigator.pop(dialogCtx); // Close loading
+        Navigator.pop(dialogCtx); // Close main form
+      }
+
+      // Show success message
+      if (parentContext.mounted) {
+        showDialog(
+          context: parentContext,
+          builder: (successCtx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success animation
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1A5F2D), Color(0xFF4CAF50)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4CAF50).withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Berhasil! 🎉',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A5F2D),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Room pengajian sudah aktif dan QR sudah dikirimkan ke semua peserta target.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A5F2D).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Target: $targetName',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A5F2D),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(successCtx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A5F2D),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.done, size: 20),
+                  label: const Text('Tutup'),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+
+      // Show error
+      if (parentContext.mounted) {
+        String msg = e.toString();
+        if (msg.startsWith('Exception: ')) {
+          msg = msg.replaceFirst('Exception: ', '');
+        }
+        ScaffoldMessenger.of(parentContext).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text(msg)),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildPreviewRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF1A5F2D)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A5F2D),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1309,248 +1701,5 @@ class _PengajianLevelSelectorState extends State<PengajianLevelSelector> {
         }
       }
     }
-  }
-
-  Widget _buildInlineTargetManager() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          ListTile(
-            onTap: () => setState(() => _isTargetExpanded = !_isTargetExpanded),
-            leading: const Icon(
-              Icons.settings_suggest,
-              color: Color(0xFF1A5F2D),
-            ),
-            title: const Text(
-              "Manajemen Target Peserta",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-            subtitle: const Text(
-              "Kelola kriteria umur & status peserta",
-              style: TextStyle(fontSize: 11),
-            ),
-            trailing: Icon(
-              _isTargetExpanded ? Icons.expand_less : Icons.expand_more,
-            ),
-          ),
-          if (_isTargetExpanded) ...[
-            const Divider(height: 1),
-            if (_isLoadingTargets)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_targetList.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    const Text(
-                      "Belum ada target kustom",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: _showAddTargetDialog,
-                      icon: const Icon(Icons.add),
-                      label: const Text("Buat Target Pertama"),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Column(
-                children: [
-                  ..._targetList.map((t) {
-                    final isMine = t.orgId == widget.orgId;
-                    return ListTile(
-                      dense: true,
-                      title: Text(
-                        t.namaTarget,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(
-                        "${t.jenisKelamin}, ${t.minUmur}-${t.maxUmur} thn, ${t.statusWarga}, ${t.statusPernikahan}",
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      trailing: isMine
-                          ? IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              onPressed: () async {
-                                await _targetService.deleteTarget(t.id);
-                                _fetchTargets();
-                              },
-                            )
-                          : Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                "Pinjaman",
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                            ),
-                    );
-                  }),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ElevatedButton.icon(
-                      onPressed: _showAddTargetDialog,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text("Tambah Target Baru"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A5F2D),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 36),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _showAddTargetDialog() {
-    final nameController = TextEditingController();
-    int minUmur = 0;
-    int maxUmur = 100;
-    String selectedJK = 'Semua';
-    String selectedStatus = 'Semua';
-    String selectedKeperluan = 'Semua';
-    String selectedNikah = 'Semua';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          title: const Text("Buat Target Baru"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: "Nama Target",
-                    hintText: "Contoh: Remaja Perantau Pria",
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Range Umur",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: "Min"),
-                        onChanged: (val) => minUmur = int.tryParse(val) ?? 0,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextField(
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: "Max"),
-                        onChanged: (val) => maxUmur = int.tryParse(val) ?? 100,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedJK,
-                  decoration: const InputDecoration(labelText: "Jenis Kelamin"),
-                  items: ['Semua', 'Pria', 'Wanita']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (val) => setModalState(() => selectedJK = val!),
-                ),
-                DropdownButtonFormField<String>(
-                  value: selectedStatus,
-                  decoration: const InputDecoration(labelText: "Status Warga"),
-                  items: ['Semua', 'Warga Asli', 'Perantau']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (val) =>
-                      setModalState(() => selectedStatus = val!),
-                ),
-                DropdownButtonFormField<String>(
-                  value: selectedKeperluan,
-                  decoration: const InputDecoration(labelText: "Keperluan"),
-                  items: ['Semua', 'MT', 'Kuliah', 'Bekerja']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (val) =>
-                      setModalState(() => selectedKeperluan = val!),
-                ),
-                DropdownButtonFormField<String>(
-                  value: selectedNikah,
-                  decoration: const InputDecoration(
-                    labelText: "Status Pernikahan",
-                  ),
-                  items: ['Semua', 'Kawin', 'Belum Kawin']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (val) => setModalState(() => selectedNikah = val!),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Batal"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.isEmpty) return;
-                final newTarget = TargetKriteria(
-                  id: '',
-                  orgId: widget.orgId,
-                  orgDaerahId: widget.user.orgDaerahId,
-                  orgDesaId: widget.user.orgDesaId,
-                  orgKelompokId: widget.user.orgKelompokId,
-                  namaTarget: nameController.text.trim(),
-                  minUmur: minUmur,
-                  maxUmur: maxUmur,
-                  jenisKelamin: selectedJK,
-                  statusWarga: selectedStatus,
-                  keperluan: selectedKeperluan,
-                  statusPernikahan: selectedNikah,
-                  createdBy: widget.user.id,
-                );
-                await _targetService.createTarget(newTarget);
-                Navigator.pop(ctx);
-                _fetchTargets();
-              },
-              child: const Text("Simpan"),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

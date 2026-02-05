@@ -4,6 +4,7 @@ import 'package:hpdaerah/models/pengajian_model.dart';
 import 'package:hpdaerah/services/pengajian_service.dart';
 import 'package:hpdaerah/models/target_kriteria_model.dart';
 import 'package:hpdaerah/services/target_kriteria_service.dart';
+import 'package:hpdaerah/views/auth/dashboard/admin/pengajian/buatroom/smart_target_builder.dart';
 
 class PengajianFormPage extends StatefulWidget {
   final UserModel user;
@@ -40,6 +41,9 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
   String? _selectedTargetKriteriaId; // Link ke tabel target_kriteria
   List<TargetKriteria> _systemTargets = [];
   bool _isLoading = false;
+
+  // New target selection state
+  TargetSelection? _targetSelection;
 
   @override
   void initState() {
@@ -156,6 +160,9 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
         targetAudience: confirmedProps.targetAudience, // Use value from dialog
         targetKriteriaId:
             confirmedProps.targetKriteriaId, // Use value from dialog
+        // New target fields
+        targetKelasIds: _targetSelection?.kelasIds,
+        targetMode: _targetSelection?.modeString ?? 'all',
         roomCode: _roomCodeController.text
             .trim()
             .toUpperCase(), // Keep mostly hidden
@@ -264,37 +271,33 @@ class _PengajianFormPageState extends State<PengajianFormPage> {
               ),
               const SizedBox(height: 20),
 
-              // Target Peserta
+              // Target Peserta - Smart Target Builder
               _buildLabel('Target Peserta'),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedTargetKriteriaId,
-                items: _systemTargets.map((t) {
-                  return DropdownMenuItem(
-                    value: t.id,
-                    child: Text(t.namaTarget),
-                  );
-                }).toList(),
-                onChanged: (val) {
+              SmartTargetBuilder(
+                orgId: widget.orgId,
+                adminLevel: widget.user.adminLevel ?? 4,
+                systemTargets: _systemTargets,
+                onSelectionChanged: (selection) {
                   setState(() {
-                    _selectedTargetKriteriaId = val;
-                    _selectedTarget = _systemTargets
-                        .firstWhere((element) => element.id == val)
-                        .namaTarget;
+                    _targetSelection = selection;
+                    // Also update legacy fields for compatibility
+                    if (selection.mode == TargetMode.kriteria) {
+                      _selectedTargetKriteriaId = selection.kriteriaId;
+                      if (selection.kriteriaId != null) {
+                        _selectedTarget = _systemTargets
+                            .firstWhere((t) => t.id == selection.kriteriaId)
+                            .namaTarget;
+                      }
+                    } else {
+                      _selectedTargetKriteriaId = null;
+                      _selectedTarget = selection.mode == TargetMode.all
+                          ? 'Semua Anggota'
+                          : 'Kelas Tertentu';
+                    }
                   });
                 },
-                decoration: _inputDecoration('Pilih target peserta'),
-                validator: (val) =>
-                    val == null ? 'Target peserta wajib dipilih' : null,
               ),
-              if (_systemTargets.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    "* Belum ada target. Buat dulu di halaman depan Admin.",
-                    style: TextStyle(color: Colors.red[700], fontSize: 11),
-                  ),
-                ),
               const SizedBox(height: 20),
 
               // Tanggal & Waktu
