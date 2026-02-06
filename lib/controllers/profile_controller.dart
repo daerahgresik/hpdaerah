@@ -4,6 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/utils/image_helper.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:hpdaerah/services/organization_service.dart';
+import 'package:hpdaerah/services/auth_service.dart';
 
 class ProfileController {
   final SupabaseClient _client = Supabase.instance.client;
@@ -141,5 +144,126 @@ class ProfileController {
     } catch (e) {
       throw 'Gagal upload foto ke storage: $e';
     }
+  }
+
+  /// Link Google Account using existing credentials/account object (from GoogleAuthButton)
+  Future<UserModel> linkGoogleAccountFromCreds(
+    UserModel currentUser,
+    GoogleSignInAccount account,
+  ) async {
+    try {
+      // Internal signIn removed because we receive the account
+
+      // Check if email already used by another user (optional security check)
+      // For now we assume Supabase constraint or logic helps us, but good to handle errors.
+
+      final updates = {
+        'email': account.email,
+        'google_id': account.id,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // Also update photo if user doesn't have one?
+      // User request said: "bukan hanya disediakan untuk tempat menautkan melainkan juga di tampilkan akun google apa yg dia gunakan"
+      // So mainly we just want to link.
+
+      // Update DB
+      if (currentUser.isSuperAdmin) {
+        await _client
+            .from('super_admins')
+            .update(updates)
+            .eq('id', currentUser.id!);
+      } else {
+        await _client.from('users').update(updates).eq('id', currentUser.id!);
+      }
+
+      // Return updated model locally
+      return currentUser.copyWith(email: account.email, googleId: account.id);
+    } catch (e) {
+      throw 'Gagal menautkan akun Google: $e';
+    }
+  }
+
+  /// Unlink Google Account (remove email & google_id)
+  Future<UserModel> unlinkGoogleAccount(UserModel currentUser) async {
+    try {
+      final updates = {
+        'email': null,
+        'google_id': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // Update DB
+      if (currentUser.isSuperAdmin) {
+        await _client
+            .from('super_admins')
+            .update(updates)
+            .eq('id', currentUser.id!);
+      } else {
+        await _client.from('users').update(updates).eq('id', currentUser.id!);
+      }
+
+      // Return updated model locally
+      return currentUser.copyWithUnlinkedGoogle();
+    } catch (e) {
+      throw 'Gagal memutuskan akun Google: $e';
+    }
+  }
+
+  // --- NEW: FETCH DETAILED PROFILE (ORG NAMES) ---
+  final OrganizationService _organizationService =
+      OrganizationService(); // Need this imported
+
+  Future<UserModel> fetchDetailedProfile(UserModel user) async {
+    String? daerahName = user.orgDaerahName;
+    String? desaName = user.orgDesaName;
+    String? kelompokName = user.orgKelompokName;
+
+    // Only fetch if name is missing but ID exists
+    if (user.orgDaerahId != null && daerahName == null) {
+      final org = await _organizationService.getOrgById(user.orgDaerahId!);
+      daerahName = org?.name;
+    }
+    if (user.orgDesaId != null && desaName == null) {
+      final org = await _organizationService.getOrgById(user.orgDesaId!);
+      desaName = org?.name;
+    }
+    if (user.orgKelompokId != null && kelompokName == null) {
+      final org = await _organizationService.getOrgById(user.orgKelompokId!);
+      kelompokName = org?.name;
+    }
+
+    return user.copyWith(
+      orgDaerahName: daerahName,
+      orgDesaName: desaName,
+      orgKelompokName: kelompokName,
+    );
+  }
+
+  // --- NEW: FETCH ADMIN CONTACTS ---
+  // Returns Map: {'Daerah': [List of Admins], 'Desa': [...], 'Kelompok': [...]}
+  Future<Map<String, List<UserModel>>> fetchMyAdmins(UserModel user) async {
+    final Map<String, List<UserModel>> result = {
+      'Daerah': [],
+      'Desa': [],
+      'Kelompok': [],
+    };
+
+    final authService = AuthService(); // Need AuthService imported or passed
+
+    if (user.orgDaerahId != null) {
+      result['Daerah'] = await authService.getAdminsByOrg(user.orgDaerahId!, 1);
+    }
+    if (user.orgDesaId != null) {
+      result['Desa'] = await authService.getAdminsByOrg(user.orgDesaId!, 2);
+    }
+    if (user.orgKelompokId != null) {
+      result['Kelompok'] = await authService.getAdminsByOrg(
+        user.orgKelompokId!,
+        3,
+      );
+    }
+
+    return result;
   }
 }

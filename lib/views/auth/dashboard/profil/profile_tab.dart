@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:hpdaerah/controllers/profile_controller.dart';
+import 'package:hpdaerah/views/auth/google_auth_btn.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileTab extends StatefulWidget {
   final UserModel user;
@@ -21,10 +23,72 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _isLoading = false;
   final ProfileController _profileController = ProfileController();
 
+  // State for Admin Contacts
+  Map<String, List<UserModel>> _adminContacts = {};
+  bool _isLoadingAdmins = true;
+
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
+    // Load detailed data (org names & admin contacts) after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDetailedProfile();
+    });
+  }
+
+  Future<void> _loadDetailedProfile() async {
+    try {
+      // 1. Fetch Organization Names to populate Detail Sambung
+      final userWithDetails = await _profileController.fetchDetailedProfile(
+        _currentUser,
+      );
+      if (mounted) {
+        setState(() {
+          _currentUser = userWithDetails;
+        });
+      }
+
+      // 2. Fetch Admin Contacts
+      final admins = await _profileController.fetchMyAdmins(_currentUser);
+      if (mounted) {
+        setState(() {
+          _adminContacts = admins;
+          _isLoadingAdmins = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading profile details: $e");
+      if (mounted) setState(() => _isLoadingAdmins = false);
+    }
+  }
+
+  Future<void> _launchWA(String? number, String name) async {
+    if (number == null || number.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nomor WhatsApp tidak tersedia')),
+      );
+      return;
+    }
+
+    // Clean number (remove non-digits, replace 0 with 62)
+    var cleanNum = number.replaceAll(RegExp(r'\D'), '');
+    if (cleanNum.startsWith('0')) {
+      cleanNum = '62${cleanNum.substring(1)}';
+    }
+
+    final message = Uri.encodeComponent(
+      "Assalamualaikum Admin, saya ${_currentUser.nama} (Username: ${_currentUser.username}) ingin bertanya...",
+    );
+    final url = Uri.parse("https://wa.me/$cleanNum?text=$message");
+
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal membuka WhatsApp: $e')));
+    }
   }
 
   Future<void> _updateProfile({
@@ -73,6 +137,91 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
         );
         Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _onGoogleSignInSuccess(dynamic googleAccount) async {
+    setState(() => _isLoading = true);
+    try {
+      // Call controller to update DB
+      final updatedUser = await _profileController.linkGoogleAccountFromCreds(
+        _currentUser,
+        googleAccount,
+      );
+      setState(() {
+        _currentUser = updatedUser;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Akun Google berhasil ditautkan!'),
+            backgroundColor: Color(0xFF1A5F2D),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _confirmUnlinkGoogle() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Putuskan Tautan?'),
+        content: const Text(
+          'Apakah Anda yakin ingin memutus tautan akun Google? Anda tidak akan bisa login dengan Google lagi sampai menautkannya kembali.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Putuskan'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _unlinkGoogleAccount();
+    }
+  }
+
+  Future<void> _unlinkGoogleAccount() async {
+    setState(() => _isLoading = true);
+    try {
+      final updatedUser = await _profileController.unlinkGoogleAccount(
+        _currentUser,
+      );
+      setState(() {
+        _currentUser = updatedUser;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Akun Google berhasil diputuskan!'),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -168,7 +317,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
+                              color: Colors.black.withOpacity(0.1),
                               blurRadius: 10,
                             ),
                           ],
@@ -689,7 +838,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
+                          color: Colors.black.withOpacity(0.08),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -702,15 +851,13 @@ class _ProfileTabState extends State<ProfileTab> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: primaryGreen.withValues(alpha: 0.2),
+                              color: primaryGreen.withOpacity(0.2),
                               width: 2,
                             ),
                           ),
                           child: CircleAvatar(
                             radius: 45,
-                            backgroundColor: primaryGreen.withValues(
-                              alpha: 0.1,
-                            ),
+                            backgroundColor: primaryGreen.withOpacity(0.1),
                             backgroundImage: _currentUser.fotoProfil != null
                                 ? NetworkImage(_currentUser.fotoProfil!)
                                 : null,
@@ -765,60 +912,459 @@ class _ProfileTabState extends State<ProfileTab> {
                   // TAG: DIGITAL CARD / BARCODE SECTION - REMOVED AS REQUESTED
                   // _buildDigitalCardSection(),
                   const SizedBox(height: 24),
+                  // --- SECTION 1: DETAIL INFORMASI ---
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.feed_outlined, color: primaryGreen),
-                            SizedBox(width: 8),
-                            Text(
-                              'Detail Informasi',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                        const Divider(height: 24),
-                        _buildDetailRow('Asal', _currentUser.asal),
-                        _buildDetailRow('Status', _currentUser.status),
-                        _buildDetailRow(
-                          'Jenis Kelamin',
-                          _currentUser.jenisKelamin,
-                        ),
-                        _buildDetailRow(
-                          'Tanggal Lahir',
-                          _currentUser.tanggalLahir != null
-                              ? "${_currentUser.tanggalLahir!.day}/${_currentUser.tanggalLahir!.month}/${_currentUser.tanggalLahir!.year}"
-                              : null,
-                        ),
-                        if (_currentUser.asal == 'Perantau')
-                          _buildDetailRow(
-                            'Asal Daerah',
-                            _currentUser.asalDaerah,
-                          ),
-                        _buildDetailRow('No. WA', _currentUser.noWa),
-                        if (_currentUser.keperluan != null &&
-                            _currentUser.keperluan!.isNotEmpty)
-                          _buildDetailRow('Keperluan', _currentUser.keperluan),
-                        if (_currentUser.detailKeperluan != null &&
-                            _currentUser.detailKeperluan!.isNotEmpty)
-                          _buildDetailRow(
-                            'Detail',
-                            _currentUser.detailKeperluan,
-                          ),
-                        if (_currentUser.keterangan != null)
-                          _buildDetailRow('Catatan', _currentUser.keterangan),
                       ],
+                    ),
+                    child: Theme(
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(
+                          Icons.feed_outlined,
+                          color: primaryGreen,
+                        ),
+                        title: const Text(
+                          'Detail Informasi',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: Column(
+                              children: [
+                                const Divider(height: 1),
+                                const SizedBox(height: 16),
+                                // Moved Username/Pass here
+                                _buildDetailRow(
+                                  'Username',
+                                  _currentUser.username,
+                                ),
+                                _buildDetailRow(
+                                  'Password',
+                                  _currentUser.password ?? '******',
+                                  isPassword: true,
+                                ),
+                                const SizedBox(height: 8),
+                                _buildDetailRow(
+                                  'Nama Lengkap',
+                                  _currentUser.nama,
+                                ),
+                                _buildDetailRow('Asal', _currentUser.asal),
+                                _buildDetailRow('Status', _currentUser.status),
+                                _buildDetailRow(
+                                  'Jenis Kelamin',
+                                  _currentUser.jenisKelamin,
+                                ),
+                                _buildDetailRow(
+                                  'Tanggal Lahir',
+                                  _currentUser.tanggalLahir != null
+                                      ? "${_currentUser.tanggalLahir!.day}/${_currentUser.tanggalLahir!.month}/${_currentUser.tanggalLahir!.year}"
+                                      : null,
+                                ),
+                                _buildDetailRow(
+                                  'Asal Daerah',
+                                  _currentUser.asalDaerah,
+                                ), // Always show if not null
+                                _buildDetailRow('No. WA', _currentUser.noWa),
+                                _buildDetailRow(
+                                  'Keperluan',
+                                  _currentUser.keperluan,
+                                ),
+                                _buildDetailRow(
+                                  'Detail',
+                                  _currentUser.detailKeperluan,
+                                ),
+                                _buildDetailRow(
+                                  'Catatan',
+                                  _currentUser.keterangan,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // --- SECTION 2: DETAIL SAMBUNG (ORGANISASI) ---
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Theme(
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(
+                          Icons.share_location_outlined,
+                          color: Colors.blue,
+                        ),
+                        title: const Text(
+                          'Detail Sambung',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: Column(
+                              children: [
+                                const Divider(height: 1),
+                                const SizedBox(height: 16),
+                                _buildDetailRow(
+                                  'Daerah',
+                                  _currentUser.orgDaerahName,
+                                ),
+                                _buildDetailRow(
+                                  'Desa',
+                                  _currentUser.orgDesaName,
+                                ),
+                                _buildDetailRow(
+                                  'Kelompok',
+                                  _currentUser.orgKelompokName,
+                                ),
+                                if (_currentUser.orgDaerahName == null &&
+                                    _currentUser.orgDesaName == null &&
+                                    _currentUser.orgKelompokName == null)
+                                  const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Text(
+                                      'Data organisasi sedang dimuat atau kosong...',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // --- SECTION 3: TAUTAN AKUN (GOOGLE) ---
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Theme(
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(
+                          Icons.link,
+                          color: Color(0xFF1A5F2D),
+                        ),
+                        title: const Text(
+                          'Tautan Akun',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Divider(height: 1),
+                                const SizedBox(height: 16),
+                                if (_currentUser.email != null &&
+                                    _currentUser.email!.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.green.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: Colors.green,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Terhubung dengan Google',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                  color: Colors.green,
+                                                ),
+                                              ),
+                                              Text(
+                                                _currentUser.email!,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          onPressed: _confirmUnlinkGoogle,
+                                          icon: const Icon(
+                                            Icons.link_off,
+                                            color: Colors.red,
+                                          ),
+                                          tooltip: 'Putuskan Tautan',
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Tautkan akun Google untuk mempermudah login.',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: GoogleAuthButton(
+                                          isLoading: _isLoading,
+                                          onSignInSuccess: (account) {
+                                            if (account != null) {
+                                              _onGoogleSignInSuccess(account);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // --- SECTION 4: KONTAK ADMIN ---
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Theme(
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(
+                          Icons.support_agent,
+                          color: Colors.orange,
+                        ),
+                        title: const Text(
+                          'Kontak Admin',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: _isLoadingAdmins
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 16),
+                                      // ADMIN KELOMPOK
+                                      _buildAdminContactGroup(
+                                        'Admin Kelompok',
+                                        _adminContacts['Kelompok'],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      // ADMIN DESA
+                                      _buildAdminContactGroup(
+                                        'Admin Desa',
+                                        _adminContacts['Desa'],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      // ADMIN DAERAH
+                                      _buildAdminContactGroup(
+                                        'Admin Daerah',
+                                        _adminContacts['Daerah'],
+                                      ),
+                                      if ((_adminContacts['Kelompok'] == null ||
+                                              _adminContacts['Kelompok']!
+                                                  .isEmpty) &&
+                                          (_adminContacts['Desa'] == null ||
+                                              _adminContacts['Desa']!
+                                                  .isEmpty) &&
+                                          (_adminContacts['Daerah'] == null ||
+                                              _adminContacts['Daerah']!
+                                                  .isEmpty))
+                                        const Text(
+                                          "Belum ada data admin untuk daerah/desa/kelompok Anda.",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // --- SECTION 5: TENTANG APLIKASI ---
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Theme(
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(
+                          Icons.info_outline,
+                          color: Colors.blue,
+                        ),
+                        title: const Text(
+                          'Tentang Aplikasi',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Divider(height: 1),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Proyek ini versi pertama dikembangkan oleh tim encedev',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Kredit:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                _buildDetailRow('Founder & Developer', 'ence'),
+                                _buildDetailRow('Developer', 'surya'),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final url = Uri.parse(
+                                        'https://www.instagram.com/ence.dev?igsh=MTY2eTdsNDk5Y2Rudw==',
+                                      );
+                                      if (await canLaunchUrl(url)) {
+                                        await launchUrl(
+                                          url,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text('Kunjungi Profil Tim'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.purple,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -856,32 +1402,120 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildDetailRow(String label, String? value) {
+  Widget _buildAdminContactGroup(String title, List<UserModel>? admins) {
+    if (admins == null || admins.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...admins.map(
+          (admin) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              children: [
+                // Avatar
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey[200],
+                  backgroundImage: admin.fotoProfil != null
+                      ? NetworkImage(admin.fotoProfil!)
+                      : null,
+                  child: admin.fotoProfil == null
+                      ? const Icon(Icons.person, size: 16, color: Colors.grey)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        admin.nama,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (admin.jabatan != null && admin.jabatan!.isNotEmpty)
+                        Text(
+                          admin.jabatan!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat, color: Colors.green),
+                  onPressed: () => _launchWA(admin.noWa, admin.nama),
+                  tooltip: 'Chat WhatsApp',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(
+    String label,
+    String? value, {
+    bool isPassword = false,
+  }) {
     if (value == null || value.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                color: Color(0xFF374151),
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        // Need to track local state for password visibility
+        // But StatefulBuilder's setState works within its builder.
+        // We need a variable outside.
+        // Actually, for a stateless helper method inside a stateful widget,
+        // using a ValueNotifier or just a StatefulBuilder with a local variable initialized inside is tricky
+        // because it rebuilds.
+        // Better: Make a separate StatefulWidget or just use a boolean in the main class if it's only one.
+        // Since we might have multiple passwords (unlikely) or just one, let's keep it simple.
+        // However, to keep it clean in this helper:
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 120,
+                child: Text(
+                  label,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                ),
               ),
-            ),
+              Expanded(
+                child: isPassword
+                    ? _PasswordText(text: value)
+                    : Text(
+                        value,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -915,6 +1549,47 @@ class _ProfileTabState extends State<ProfileTab> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PasswordText extends StatefulWidget {
+  final String text;
+  const _PasswordText({required this.text});
+
+  @override
+  State<_PasswordText> createState() => _PasswordTextState();
+}
+
+class _PasswordTextState extends State<_PasswordText> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            _obscure ? '******' : widget.text,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: Color(0xFF374151),
+            ),
+          ),
+        ),
+        InkWell(
+          onTap: () => setState(() => _obscure = !_obscure),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(
+              _obscure ? Icons.visibility_off : Icons.visibility,
+              size: 16,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

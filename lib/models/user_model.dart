@@ -127,6 +127,7 @@ class UserModel {
       nama: json['nama'] ?? '',
       email: json['email'],
       googleId: json['google_id'],
+      password: json['password'], // Include password validation
       asal: json['asal'], // Warga Asli / Perantau
       status: json['status'] ?? 'Belum Kawin',
       jenisKelamin: json['jenis_kelamin'],
@@ -223,6 +224,9 @@ class UserModel {
     String? orgKategoriId,
     String? email,
     String? googleId,
+    String? orgDaerahName,
+    String? orgDesaName,
+    String? orgKelompokName,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -253,6 +257,46 @@ class UserModel {
       orgDesaId: orgDesaId ?? this.orgDesaId,
       orgKelompokId: orgKelompokId ?? this.orgKelompokId,
       orgKategoriId: orgKategoriId ?? this.orgKategoriId,
+      orgDaerahName: orgDaerahName ?? this.orgDaerahName,
+      orgDesaName: orgDesaName ?? this.orgDesaName,
+      orgKelompokName: orgKelompokName ?? this.orgKelompokName,
+    );
+  }
+
+  /// Create a copy with Google Account unlinked (email & googleId set to null)
+  UserModel copyWithUnlinkedGoogle() {
+    return UserModel(
+      id: id,
+      username: username,
+      nama: nama,
+      email: null, // Start Fresh
+      googleId: null, // Start Fresh
+      password: password,
+      asal: asal,
+      status: status,
+      jenisKelamin: jenisKelamin,
+      tanggalLahir: tanggalLahir,
+      asalDaerah: asalDaerah,
+      jabatan: jabatan,
+      keterangan: keterangan,
+      fotoProfil: fotoProfil,
+      fotoSampul: fotoSampul,
+      isAdmin: isAdmin,
+      adminLevel: adminLevel,
+      adminOrgId: adminOrgId,
+      currentOrgId: currentOrgId,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      keperluan: keperluan,
+      detailKeperluan: detailKeperluan,
+      noWa: noWa,
+      orgDaerahId: orgDaerahId,
+      orgDesaId: orgDesaId,
+      orgKelompokId: orgKelompokId,
+      orgKategoriId: orgKategoriId,
+      orgDaerahName: orgDaerahName,
+      orgDesaName: orgDesaName,
+      orgKelompokName: orgKelompokName,
     );
   }
 

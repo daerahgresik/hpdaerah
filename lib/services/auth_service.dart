@@ -57,6 +57,26 @@ class AuthService {
       if (userResponse != null) {
         return UserModel.fromJson(userResponse);
       }
+
+      // 2. If not found in users, check super_admins
+      final superAdminResponse = await _client
+          .from('super_admins')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+
+      if (superAdminResponse != null) {
+        return UserModel(
+          id: superAdminResponse['id'],
+          username: superAdminResponse['username'],
+          nama: superAdminResponse['nama'],
+          email: superAdminResponse['email'],
+          googleId: superAdminResponse['google_id'],
+          isAdmin: true,
+          adminLevel: 0,
+        );
+      }
+
       return null;
     } catch (e) {
       debugPrint('Error fetching user by email: $e');
