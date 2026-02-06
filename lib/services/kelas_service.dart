@@ -32,39 +32,52 @@ class KelasService {
     required int adminLevel,
   }) async {
     try {
-      // Untuk admin level atas, kita perlu join dengan organizations
-      // untuk filter berdasarkan hierarki
-
       if (adminLevel == 0) {
-        // Super Admin - lihat semua
+        // Super Admin - fetch all
         final response = await _client
             .from('kelas')
-            .select()
+            .select('*, organizations!inner(name, parent_id)')
             .order('nama', ascending: true);
+
         return (response as List).map((e) => Kelas.fromJson(e)).toList();
       }
 
       if (adminLevel == 3) {
-        // Admin Kelompok - hanya kelompok mereka
         return fetchKelasByKelompok(orgId);
       }
 
-      // Admin Daerah (1) atau Desa (2) - perlu query hierarki
-      // Fetch kelompok-kelompok di bawah org ini
-      final List<String> kelompokIds = await _getKelompokIdsInHierarchy(
+      // 1. Get Kelompok Infos (ID, Name, Desa Name)
+      final kelompokInfos = await _getKelompokInfosInHierarchy(
         orgId: orgId,
         adminLevel: adminLevel,
       );
 
-      if (kelompokIds.isEmpty) return [];
+      if (kelompokInfos.isEmpty) return [];
 
+      final kelompokIds = kelompokInfos.map((k) => k['id'] as String).toList();
+
+      // 2. Fetch Classes
       final response = await _client
           .from('kelas')
           .select()
           .inFilter('org_kelompok_id', kelompokIds)
           .order('nama', ascending: true);
 
-      return (response as List).map((e) => Kelas.fromJson(e)).toList();
+      // 3. Map organization info to classes
+      return (response as List).map((e) {
+        final kelas = Kelas.fromJson(e);
+        final info = kelompokInfos.firstWhere(
+          (k) => k['id'] == kelas.orgKelompokId,
+          orElse: () => {},
+        );
+
+        String displayName = info['name'] ?? '';
+        if (info['desa_name'] != null) {
+          displayName = '${info['desa_name']} - $displayName';
+        }
+
+        return kelas.copyWith(kelompokName: displayName);
+      }).toList();
     } catch (e) {
       debugPrint("Error fetchKelasInHierarchy: $e");
       return [];

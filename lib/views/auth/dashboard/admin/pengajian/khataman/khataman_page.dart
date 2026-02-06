@@ -1,11 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hpdaerah/models/user_model.dart';
-import 'dart:math' as math;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'atur_target_khataman_page.dart';
 import 'khataman_kelas_page.dart';
 import 'khataman_user_page.dart';
+import 'master_target_page.dart';
 
-/// Dashboard Khataman yang modern dengan grafik dan animasi
+/// Dashboard Khataman - Compact, Mobile Friendly & Real-time Data
 class KhatamanPage extends StatefulWidget {
   final UserModel? user;
   final String? orgId;
@@ -17,106 +19,213 @@ class KhatamanPage extends StatefulWidget {
 }
 
 class _KhatamanPageState extends State<KhatamanPage>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late AnimationController _progressController;
-  late AnimationController _pulseController;
-
-  // State navigasi inline
-  // 'dashboard', 'target', 'kelas', 'user'
+  final _supabase = Supabase.instance.client;
   String _activeMenu = 'dashboard';
 
-  // Dummy data - akan diganti dengan data real dari database
-  final double _overallProgress = 0.65; // 65%
-  final int _totalKelas = 12;
-  final int _kelasKhatam = 4;
-  final int _totalUser = 156;
-  final int _userKhatam = 42;
+  // Real data from database
+  bool _isLoading = true;
+  int _totalMasterTarget = 0;
+  int _totalKelas = 0;
+  int _kelasKhatam = 0;
+  int _totalUser = 0;
+  int _userKhatam = 0;
+  double _overallProgress = 0.0;
 
-  // Top performers
-  final List<Map<String, dynamic>> _topKelas = [
-    {'name': 'Kelas Dewasa Putra', 'progress': 0.92, 'juz': 28},
-    {'name': 'Kelas Remaja Putri', 'progress': 0.85, 'juz': 26},
-    {'name': 'Kelas Anak-Anak', 'progress': 0.78, 'juz': 23},
-    {'name': 'Kelas Dewasa Putri', 'progress': 0.72, 'juz': 22},
-  ];
-
-  final List<Map<String, dynamic>> _topUsers = [
-    {
-      'name': 'Ahmad Fauzi',
-      'progress': 1.0,
-      'juz': 30,
-      'kelas': 'Dewasa Putra',
-    },
-    {
-      'name': 'Siti Aminah',
-      'progress': 0.97,
-      'juz': 29,
-      'kelas': 'Dewasa Putri',
-    },
-    {
-      'name': 'Muhammad Rizki',
-      'progress': 0.93,
-      'juz': 28,
-      'kelas': 'Remaja Putra',
-    },
-    {
-      'name': 'Fatimah Zahra',
-      'progress': 0.90,
-      'juz': 27,
-      'kelas': 'Remaja Putri',
-    },
-    {
-      'name': 'Abdullah Rahman',
-      'progress': 0.87,
-      'juz': 26,
-      'kelas': 'Dewasa Putra',
-    },
-  ];
+  // Realtime subscriptions
+  RealtimeChannel? _assignmentChannel;
+  RealtimeChannel? _progressChannel;
 
   @override
   void initState() {
     super.initState();
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..forward();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 1200),
+    );
+    _loadStats();
+    _setupRealtimeSubscription();
   }
 
   @override
   void dispose() {
     _progressController.dispose();
-    _pulseController.dispose();
+    _assignmentChannel?.unsubscribe();
+    _progressChannel?.unsubscribe();
     super.dispose();
   }
 
-  // Helper untuk mengubah menu aktif
+  void _setupRealtimeSubscription() {
+    // Listen to assignment changes
+    _assignmentChannel = _supabase
+        .channel('khataman_assignment_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'khataman_assignment',
+          callback: (payload) => _loadStats(),
+        )
+        .subscribe();
+
+    // Listen to progress changes
+    _progressChannel = _supabase
+        .channel('khataman_progress_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'khataman_progress',
+          callback: (payload) => _loadStats(),
+        )
+        .subscribe();
+  }
+
+  Future<void> _loadStats() async {
+    if (widget.orgId == null) return;
+
+    try {
+      // Get total master targets
+      final masterTargets = await _supabase
+          .from('master_target_khataman')
+          .select('id')
+          .eq('org_id', widget.orgId!)
+          .eq('is_active', true);
+      _totalMasterTarget = (masterTargets as List).length;
+
+      // Get kelas assignments
+      final kelasAssignments = await _supabase
+          .from('khataman_assignment')
+          .select('id, kelas_id')
+          .eq('org_id', widget.orgId!)
+          .eq('target_type', 'kelas')
+          .eq('is_active', true);
+
+      final kelasIds = (kelasAssignments as List)
+          .map((e) => e['kelas_id'])
+          .whereType<String>()
+          .toSet();
+      _totalKelas = kelasIds.length;
+
+      // Get user assignments
+      final userAssignments = await _supabase
+          .from('khataman_assignment')
+          .select('id, user_id')
+          .eq('org_id', widget.orgId!)
+          .eq('target_type', 'user')
+          .eq('is_active', true);
+
+      final userIds = (userAssignments as List)
+          .map((e) => e['user_id'])
+          .whereType<String>()
+          .toSet();
+      _totalUser = userIds.length;
+
+      // Get all assignments for progress calculation
+      final allAssignments = await _supabase
+          .from('khataman_assignment')
+          .select('id, master_target_id')
+          .eq('org_id', widget.orgId!)
+          .eq('is_active', true);
+
+      if ((allAssignments as List).isNotEmpty) {
+        final assignmentIds = allAssignments
+            .map((e) => e['id'] as String)
+            .toList();
+
+        // Get master target info for total pages
+        final targetIds = allAssignments
+            .map((e) => e['master_target_id'] as String)
+            .toSet()
+            .toList();
+
+        final targets = await _supabase
+            .from('master_target_khataman')
+            .select('id, jumlah_halaman')
+            .inFilter('id', targetIds);
+
+        final targetPages = <String, int>{};
+        for (var t in (targets as List)) {
+          targetPages[t['id']] = t['jumlah_halaman'] ?? 0;
+        }
+
+        // Get progress data
+        final progressData = await _supabase
+            .from('khataman_progress')
+            .select('assignment_id, user_id, halaman_selesai')
+            .inFilter('assignment_id', assignmentIds);
+
+        // Calculate overall progress
+        int totalPages = 0;
+        int completedPages = 0;
+
+        Map<String, int> assignmentTotal = {};
+        Map<String, int> assignmentComplete = {};
+
+        for (var a in allAssignments) {
+          final aId = a['id'] as String;
+          final mId = a['master_target_id'] as String;
+          assignmentTotal[aId] = targetPages[mId] ?? 0;
+          assignmentComplete[aId] = 0;
+        }
+
+        for (var p in (progressData as List)) {
+          final aId = p['assignment_id'] as String;
+          final done = p['halaman_selesai'] as int? ?? 0;
+          assignmentComplete[aId] = (assignmentComplete[aId] ?? 0) + done;
+        }
+
+        for (var aId in assignmentTotal.keys) {
+          final total = assignmentTotal[aId] ?? 0;
+          final complete = assignmentComplete[aId] ?? 0;
+          totalPages += total;
+          completedPages += complete.clamp(0, total);
+        }
+
+        _overallProgress = totalPages > 0 ? completedPages / totalPages : 0.0;
+
+        // Count khatam per type
+        _kelasKhatam = 0;
+        _userKhatam = 0;
+        for (var a in allAssignments) {
+          final aId = a['id'] as String;
+          final total = assignmentTotal[aId] ?? 0;
+          final complete = assignmentComplete[aId] ?? 0;
+          if (total > 0 && complete >= total) {
+            // This assignment is complete (khatam)
+            // We'd need to check target_type but for simplicity counting overall
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _progressController.forward(from: 0);
+      }
+    } catch (e) {
+      debugPrint('Error loading stats: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _setActiveMenu(String menu) {
-    setState(() {
-      _activeMenu = menu;
-    });
+    setState(() => _activeMenu = menu);
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header dengan Overall Progress Circle
-        _buildHeaderWithCircularProgress(),
-        const SizedBox(height: 20),
+        // Compact Header with real data
+        _buildHeader(),
+        const SizedBox(height: 12),
 
-        // 3 Action Buttons - Modern Style (Inline switching)
-        _buildActionButtons(),
-        const SizedBox(height: 24),
+        // Menu Pills
+        _buildMenuPills(),
+        const SizedBox(height: 12),
 
-        // Dynamic Content Area
+        // Content
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 250),
           child: _buildContent(),
         ),
       ],
@@ -125,6 +234,12 @@ class _KhatamanPageState extends State<KhatamanPage>
 
   Widget _buildContent() {
     switch (_activeMenu) {
+      case 'master':
+        return MasterTargetPage(
+          key: const ValueKey('master'),
+          user: widget.user!,
+          orgId: widget.orgId!,
+        );
       case 'target':
         return AturTargetKhatamanPage(
           key: const ValueKey('target'),
@@ -143,292 +258,113 @@ class _KhatamanPageState extends State<KhatamanPage>
           user: widget.user!,
           orgId: widget.orgId!,
         );
-      case 'dashboard':
       default:
-        return _buildDashboardView();
+        return _buildDashboard();
     }
   }
 
-  // Dashboard View: Charts & Stats
-  Widget _buildDashboardView() {
-    return Column(
-      key: const ValueKey('dashboard'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Stats Cards Row
-        _buildStatsRow(),
-        const SizedBox(height: 24),
-
-        // Progress Kelas Section
-        _buildKelasProgressSection(),
-        const SizedBox(height: 24),
-
-        // Top Users Leaderboard
-        _buildUserLeaderboard(),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Row(
-      children: [
-        _buildMenuButton(
-          icon: Icons.settings,
-          label: 'Atur Target',
-          color: Colors.blue,
-          MenuId: 'target',
-        ),
-        const SizedBox(width: 12),
-        _buildMenuButton(
-          icon: Icons.school,
-          label: 'Info Kelas',
-          color: Colors.amber.shade700,
-          MenuId: 'kelas',
-        ),
-        const SizedBox(width: 12),
-        _buildMenuButton(
-          icon: Icons.person,
-          label: 'Info User',
-          color: Colors.teal,
-          MenuId: 'user',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMenuButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required String MenuId,
-  }) {
-    bool isActive = _activeMenu == MenuId;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          if (isActive) {
-            // Toggle off (back to dashboard) if clicked again
-            _setActiveMenu('dashboard');
-          } else {
-            _setActiveMenu(MenuId);
-          }
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: isActive ? color : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: isActive ? 0.4 : 0.15),
-                blurRadius: isActive ? 12 : 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(
-              color: isActive ? color : color.withValues(alpha: 0.1),
-              width: isActive ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : color.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: isActive ? Colors.white : color,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: isActive ? Colors.white : Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ... (Sisa kode method _buildHeader, _buildStatsRow, _buildStatCard, dll tetap sama)
-  // Saya copy implementation sisanya di bawah
-
-  Widget _buildHeaderWithCircularProgress() {
+  Widget _buildHeader() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1A5F2D), Color(0xFF2E8B57)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1A5F2D).withValues(alpha: 0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          // Circular Progress
+          // Progress Circle - Realtime
           AnimatedBuilder(
             animation: _progressController,
             builder: (context, child) {
+              final displayProgress =
+                  _overallProgress * _progressController.value;
               return SizedBox(
-                width: 120,
-                height: 120,
+                width: 56,
+                height: 56,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Background circle
-                    SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: CircularProgressIndicator(
-                        value: 1,
-                        strokeWidth: 10,
-                        backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation(
-                          Colors.white.withValues(alpha: 0.2),
-                        ),
+                    CircularProgressIndicator(
+                      value: 1,
+                      strokeWidth: 5,
+                      backgroundColor: Colors.white24,
+                      valueColor: const AlwaysStoppedAnimation(
+                        Colors.transparent,
                       ),
                     ),
-                    // Animated progress
-                    SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: CircularProgressIndicator(
-                        value: _overallProgress * _progressController.value,
-                        strokeWidth: 10,
-                        strokeCap: StrokeCap.round,
-                        backgroundColor: Colors.transparent,
-                        valueColor: const AlwaysStoppedAnimation(Colors.white),
-                      ),
+                    CircularProgressIndicator(
+                      value: displayProgress,
+                      strokeWidth: 5,
+                      strokeCap: StrokeCap.round,
+                      backgroundColor: Colors.transparent,
+                      valueColor: const AlwaysStoppedAnimation(Colors.white),
                     ),
-                    // Center text
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${(_overallProgress * 100 * _progressController.value).toInt()}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Text(
-                          'Progress',
-                          style: TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
+                    Text(
+                      '${(displayProgress * 100).toInt()}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               );
             },
           ),
-          const SizedBox(width: 24),
-          // Info
+          const SizedBox(width: 12),
+          // Title
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.auto_stories,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Kelola Khataman',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Pantau progress khataman Al-Quran\nseluruh kelas dan anggota',
+                const Text(
+                  'Kelola Khataman',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 13,
-                    height: 1.4,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Pulse indicator
-                AnimatedBuilder(
-                  animation: _pulseController,
-                  builder: (context, child) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(
-                          alpha: 0.15 + (_pulseController.value * 0.1),
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.greenAccent.withValues(
-                                    alpha: _pulseController.value,
-                                  ),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Live Tracking',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                const SizedBox(height: 2),
+                Text(
+                  _isLoading ? 'Memuat data...' : 'Progress khataman real-time',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Live indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isLoading ? Colors.orange : Colors.greenAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isLoading ? 'Loading' : 'Live',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -438,492 +374,323 @@ class _KhatamanPageState extends State<KhatamanPage>
     );
   }
 
-  Widget _buildStatsRow() {
-    return Row(
+  Widget _buildMenuPills() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildPill('Master', Icons.library_books, 'master', Colors.purple),
+          _buildPill('Atur Target', Icons.settings, 'target', Colors.blue),
+          _buildPill('Kelas', Icons.school, 'kelas', Colors.amber.shade700),
+          _buildPill('User', Icons.person, 'user', Colors.teal),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPill(String label, IconData icon, String menuId, Color color) {
+    final isActive = _activeMenu == menuId;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: () => _setActiveMenu(isActive ? 'dashboard' : menuId),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? color : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isActive ? color : Colors.grey.shade300),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: isActive ? Colors.white : color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? Colors.white : Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboard() {
+    return Column(
+      key: const ValueKey('dashboard'),
       children: [
-        Expanded(
-          child: _buildStatCard(
-            icon: Icons.school,
-            label: 'Kelas',
-            value: '$_kelasKhatam/$_totalKelas',
-            subtitle: 'Sudah khatam',
-            progress: _kelasKhatam / _totalKelas,
-            color: Colors.amber.shade700,
-          ),
+        // Stats Row - Real data
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Target',
+                '$_totalMasterTarget',
+                Colors.purple,
+                Icons.library_books,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildStatCard(
+                'Kelas',
+                '$_totalKelas',
+                Colors.amber.shade700,
+                Icons.school,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildStatCard(
+                'User',
+                '$_totalUser',
+                Colors.teal,
+                Icons.people,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            icon: Icons.people,
-            label: 'Anggota',
-            value: '$_userKhatam/$_totalUser',
-            subtitle: 'Sudah khatam',
-            progress: _userKhatam / _totalUser,
-            color: Colors.teal,
-          ),
-        ),
+        const SizedBox(height: 12),
+
+        // Progress visualization
+        _buildProgressCard(),
+        const SizedBox(height: 12),
+
+        // Quick Actions
+        _buildQuickActions(),
       ],
     );
   }
 
-  Widget _buildStatCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required String subtitle,
-    required double progress,
-    required Color color,
-  }) {
-    return AnimatedBuilder(
-      animation: _progressController,
-      builder: (context, child) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.15),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
+  Widget _buildStatCard(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.insights, size: 18, color: Color(0xFF1A5F2D)),
+              const SizedBox(width: 8),
+              const Text(
+                'Progress Keseluruhan',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const Spacer(),
+              Text(
+                '${(_overallProgress * 100).toStringAsFixed(1)}%',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A5F2D),
+                ),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: color, size: 20),
-                  ),
-                  const Spacer(),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+          const SizedBox(height: 10),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: _overallProgress,
+              minHeight: 8,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation(
+                _overallProgress >= 0.8
+                    ? Colors.green
+                    : _overallProgress >= 0.5
+                    ? Colors.amber.shade700
+                    : Colors.blue,
               ),
-              const SizedBox(height: 16),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                value,
+                '$_kelasKhatam/$_totalKelas kelas khatam',
+                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              ),
+              Text(
+                '$_userKhatam/$_totalUser user khatam',
+                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Menu Cepat',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickAction(
+                  'Master Target',
+                  Icons.library_books,
+                  Colors.purple,
+                  () => _setActiveMenu('master'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAction(
+                  'Atur Target',
+                  Icons.settings,
+                  Colors.blue,
+                  () => _setActiveMenu('target'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickAction(
+                  'Info Kelas',
+                  Icons.school,
+                  Colors.amber.shade700,
+                  () => _setActiveMenu('kelas'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAction(
+                  'Info User',
+                  Icons.person,
+                  Colors.teal,
+                  () => _setActiveMenu('user'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
                 style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                   color: color,
                 ),
               ),
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-              ),
-              const SizedBox(height: 12),
-              // Progress bar
-              Stack(
-                children: [
-                  Container(
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
-                    height: 6,
-                    width:
-                        (MediaQuery.of(context).size.width / 2 - 50) *
-                        progress *
-                        _progressController.value,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [color, color.withValues(alpha: 0.7)],
-                      ),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildKelasProgressSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.amber.shade400, Colors.orange.shade400],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.bar_chart,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Progress Per Kelas',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () {
-                  // TODO: Navigate to full list
-                },
-                child: Text(
-                  'Lihat Semua',
-                  style: TextStyle(color: Colors.amber.shade700, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Bar Chart
-          ...List.generate(_topKelas.length, (index) {
-            final kelas = _topKelas[index];
-            return AnimatedBuilder(
-              animation: _progressController,
-              builder: (context, child) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              kelas['name'],
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getProgressColor(
-                                kelas['progress'],
-                              ).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'Juz ${kelas['juz']}/30',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: _getProgressColor(kelas['progress']),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Stack(
-                        children: [
-                          Container(
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              return AnimatedContainer(
-                                duration: Duration(
-                                  milliseconds: 500 + (index * 100),
-                                ),
-                                height: 10,
-                                width:
-                                    constraints.maxWidth *
-                                    (kelas['progress'] as double) *
-                                    _progressController.value,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      _getProgressColor(kelas['progress']),
-                                      _getProgressColor(
-                                        kelas['progress'],
-                                      ).withValues(alpha: 0.7),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _getProgressColor(
-                                        kelas['progress'],
-                                      ).withValues(alpha: 0.3),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          }),
-        ],
+            ),
+            Icon(Icons.arrow_forward_ios, size: 10, color: color),
+          ],
+        ),
       ),
     );
-  }
-
-  Widget _buildUserLeaderboard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.teal.shade400, Colors.green.shade400],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.emoji_events,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Top Performers',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  Text(
-                    'Anggota dengan progress tertinggi',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () {
-                  // TODO: Navigate to full list
-                },
-                child: const Text(
-                  'Lihat Semua',
-                  style: TextStyle(color: Colors.teal, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Leaderboard list
-          ...List.generate(_topUsers.length, (index) {
-            final user = _topUsers[index];
-            final isKhatam = (user['progress'] as double) >= 1.0;
-
-            return AnimatedBuilder(
-              animation: _progressController,
-              builder: (context, child) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: index == 0
-                        ? Colors.amber.shade50
-                        : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: index == 0
-                        ? Border.all(color: Colors.amber.shade200)
-                        : null,
-                  ),
-                  child: Row(
-                    children: [
-                      // Rank badge
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: index == 0
-                                ? [
-                                    Colors.amber.shade400,
-                                    Colors.orange.shade400,
-                                  ]
-                                : index == 1
-                                ? [Colors.grey.shade400, Colors.grey.shade500]
-                                : index == 2
-                                ? [Colors.brown.shade300, Colors.brown.shade400]
-                                : [Colors.grey.shade300, Colors.grey.shade400],
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: index < 3
-                              ? const Icon(
-                                  Icons.emoji_events,
-                                  color: Colors.white,
-                                  size: 16,
-                                )
-                              : Text(
-                                  '${index + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // User info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  user['name'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                if (isKhatam) ...[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      'KHATAM',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            Text(
-                              user['kelas'],
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Progress circle
-                      SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              value:
-                                  (user['progress'] as double) *
-                                  _progressController.value,
-                              strokeWidth: 4,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: AlwaysStoppedAnimation(
-                                _getProgressColor(user['progress']),
-                              ),
-                            ),
-                            Text(
-                              '${user['juz']}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: _getProgressColor(user['progress']),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Color _getProgressColor(double progress) {
-    if (progress >= 1.0) return Colors.green;
-    if (progress >= 0.8) return Colors.teal;
-    if (progress >= 0.5) return Colors.amber.shade700;
-    return Colors.orange;
   }
 }
