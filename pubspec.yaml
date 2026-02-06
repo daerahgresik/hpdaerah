@@ -54,6 +54,8 @@ dependencies:
   uuid: ^4.5.2
   timeago: ^3.7.1
   flutter_svg: ^2.0.16
+  google_sign_in: ^7.2.0
+  google_sign_in_web: ^1.1.0
 
 dev_dependencies:
   flutter_test:

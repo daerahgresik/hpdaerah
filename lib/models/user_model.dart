@@ -3,6 +3,8 @@ class UserModel {
   final String? id;
   final String username;
   final String nama;
+  final String? email; // [NEW] Email for Google Auth / linking
+  final String? googleId; // [NEW] Google Subject ID
   final String? password; // Only used during registration
   final String? asal; // Warga Asli / Perantau
   final String status; // Kawin / Belum Kawin
@@ -45,6 +47,8 @@ class UserModel {
     this.id,
     required this.username,
     required this.nama,
+    this.email,
+    this.googleId,
     this.password,
     this.asal,
     this.status = 'Belum Kawin',
@@ -121,6 +125,8 @@ class UserModel {
       id: json['id'],
       username: json['username'] ?? '',
       nama: json['nama'] ?? '',
+      email: json['email'],
+      googleId: json['google_id'],
       asal: json['asal'], // Warga Asli / Perantau
       status: json['status'] ?? 'Belum Kawin',
       jenisKelamin: json['jenis_kelamin'],
@@ -161,6 +167,8 @@ class UserModel {
       if (id != null) 'id': id,
       'username': username,
       'nama': nama,
+      'email': email,
+      'google_id': googleId,
       if (password != null) 'password': password,
       'asal': asal,
       'status': status,
@@ -213,11 +221,15 @@ class UserModel {
     String? orgDesaId,
     String? orgKelompokId,
     String? orgKategoriId,
+    String? email,
+    String? googleId,
   }) {
     return UserModel(
       id: id ?? this.id,
       username: username ?? this.username,
       nama: nama ?? this.nama,
+      email: email ?? this.email,
+      googleId: googleId ?? this.googleId,
       password: password ?? this.password,
       asal: asal ?? this.asal,
       status: status ?? this.status,

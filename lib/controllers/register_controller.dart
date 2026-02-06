@@ -1,6 +1,7 @@
 ﻿import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hpdaerah/models/user_model.dart';
 import 'package:hpdaerah/models/organization_model.dart';
@@ -10,6 +11,7 @@ import 'package:hpdaerah/utils/image_helper.dart';
 class RegisterController {
   final SupabaseClient _client = Supabase.instance.client;
   final OrganizationService _organizationService = OrganizationService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   // --- HIERARCHY DATA FETCHING ---
 
@@ -38,6 +40,30 @@ class RegisterController {
     }
   }
 
+  // --- GOOGLE SIGN-IN HELPER ---
+  Future<GoogleSignInAccount?> signInWithGoogle() async {
+    try {
+      // Check if authenticate() is supported on this platform
+      final supportsAuth = await _googleSignIn.supportsAuthenticate();
+
+      if (supportsAuth) {
+        // Mobile platforms - use authenticate()
+        return await _googleSignIn.authenticate();
+      } else {
+        // Web platform - try attemptLightweightAuthentication first
+        // This works if user has previously signed in
+        final account = await _googleSignIn.attemptLightweightAuthentication();
+        if (account != null) {
+          return account;
+        }
+        // For fresh sign-in on web, caller needs to use renderButton widget
+        throw 'Untuk mendaftar dengan Google di Web, gunakan tombol Google Sign-In di bawah.';
+      }
+    } catch (e) {
+      throw 'Gagal menghubungkan Google: $e';
+    }
+  }
+
   // --- REGISTRATION LOGIC ---
 
   Future<void> registerUser({
@@ -57,6 +83,9 @@ class RegisterController {
     required String? selectedKelompok,
     required String? selectedKelas,
     required String? noWa,
+    String? email, // [NEW]
+    String? googleId, // [NEW]
+    String? googlePhotoUrl, // [NEW]
   }) async {
     try {
       // 1. Determine Organization ID (Lowest Level)
@@ -71,6 +100,8 @@ class RegisterController {
           maxKiloBytes: 200,
         );
         fotoUrl = await _uploadAvatar(compressedFile);
+      } else if (googlePhotoUrl != null) {
+        fotoUrl = googlePhotoUrl;
       }
 
       // 3. Create User Model (With Hierarchy)
@@ -90,6 +121,9 @@ class RegisterController {
         fotoProfil: fotoUrl,
         currentOrgId: determinedOrgId,
         noWa: noWa,
+        // Save Google Auth Data
+        email: email,
+        googleId: googleId,
         // Save Hierarchy Explicitly
         orgDaerahId: selectedDaerah,
         orgDesaId: selectedDesa,

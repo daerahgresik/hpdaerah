@@ -36,7 +36,7 @@ class _AturKelasPageState extends State<AturKelasPage> {
   List<Map<String, dynamic>> _desaFilter = [];
   List<Map<String, dynamic>> _kelompokFilter = [];
   String? _filterDesaId;
-  Set<String> _expandedCards = {};
+  final Set<String> _expandedCards = {};
 
   // State - Specific Mode (per kelompok)
   List<Kelas> _kelasList = [];

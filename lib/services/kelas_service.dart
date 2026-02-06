@@ -126,7 +126,7 @@ class KelasService {
         return [];
       }
 
-      return (response as List).map((e) => e['id'] as String).toList();
+      return response.map((e) => e['id'] as String).toList();
     } catch (e) {
       debugPrint("Error _getKelompokIdsInHierarchy: $e");
       return [];

@@ -5,11 +5,13 @@ import 'package:hpdaerah/models/kelas_model.dart';
 import 'package:hpdaerah/controllers/register_controller.dart'; // Import Controller
 import 'package:hpdaerah/services/kelas_service.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 // Import User Model
 import 'package:hpdaerah/hubungiadmin/contact_admin_widget.dart'; // Import New Widget
+import 'package:hpdaerah/views/auth/google_auth_btn.dart'; // Import Google Auth Button
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -42,6 +44,10 @@ class _RegisterPageState extends State<RegisterPage> {
   File? _imageFile; // File gambar yang dipilih (Non-Web)
   Uint8List? _webImageBytes; // Bytes gambar untuk Web
   XFile? _selectedXFile; // XFile untuk kedua platform
+
+  // Google Auth Data
+  GoogleSignInAccount? _googleAccount;
+  String? _googlePhotoUrl;
 
   String? _selectedKeperluan; // Keperluan Perantau
 
@@ -226,11 +232,79 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  void _handleGoogleAccountConnected(GoogleSignInAccount googleUser) {
+    setState(() {
+      _googleAccount = googleUser;
+      _namaController.text = googleUser.displayName ?? '';
+      _googlePhotoUrl = googleUser.photoUrl;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Terhubung dengan Google! Silakan lengkapi data lainnya.',
+        ),
+        backgroundColor: Color(0xFF1A5F2D),
+      ),
+    );
+  }
+
+  Widget _buildGoogleConnectSection() {
+    if (_googleAccount != null) {
+      // Already connected - show status
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Terhubung sebagai ${_googleAccount!.displayName}',
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        GoogleAuthButton(
+          onSignInSuccess: (account) {
+            if (account != null && mounted) {
+              _handleGoogleAccountConnected(account);
+            }
+          },
+        ),
+        // Additional info text for context
+        if (kIsWeb) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Klik tombol di atas untuk menghubungkan akun Google',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   void _register() async {
     // 1. Ambil list field yang kosong untuk divalidasi secara cerdas
     List<String> missingFields = [];
 
-    if (_selectedXFile == null) missingFields.add('Foto Profil');
+    if (_selectedXFile == null && _googlePhotoUrl == null) {
+      missingFields.add('Foto Profil');
+    }
     if (_namaController.text.trim().isEmpty) missingFields.add('Nama Lengkap');
     if (_noWaController.text.trim().isEmpty) missingFields.add('No. WhatsApp');
     if (_usernameController.text.trim().isEmpty) missingFields.add('Username');
@@ -307,6 +381,9 @@ class _RegisterPageState extends State<RegisterPage> {
           selectedKelas: _selectedKelas,
           fotoProfilFile: _selectedXFile,
           noWa: _noWaController.text.trim(),
+          email: _googleAccount?.email,
+          googleId: _googleAccount?.id,
+          googlePhotoUrl: _googlePhotoUrl,
         );
 
         if (mounted) {
@@ -528,6 +605,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // ===== SECTION: GOOGLE CONNECT =====
+                                    // Use renderButton for web, custom button for mobile
+                                    _buildGoogleConnectSection(),
+                                    const SizedBox(height: 16),
+
                                     // ===== SECTION: FOTO PROFIL =====
                                     _buildSectionTitle('📷', 'Foto Profil'),
                                     Center(
@@ -550,17 +632,27 @@ class _RegisterPageState extends State<RegisterPage> {
                                           ),
                                           child:
                                               (_webImageBytes != null ||
-                                                  _imageFile != null)
+                                                  _imageFile != null ||
+                                                  _googlePhotoUrl != null)
                                               ? ClipOval(
-                                                  child: kIsWeb
+                                                  child:
+                                                      kIsWeb &&
+                                                          _webImageBytes != null
                                                       ? Image.memory(
                                                           _webImageBytes!,
                                                           fit: BoxFit.cover,
                                                         )
-                                                      : Image.file(
-                                                          _imageFile!,
-                                                          fit: BoxFit.cover,
-                                                        ),
+                                                      : (_imageFile != null
+                                                            ? Image.file(
+                                                                _imageFile!,
+                                                                fit: BoxFit
+                                                                    .cover,
+                                                              )
+                                                            : Image.network(
+                                                                _googlePhotoUrl!,
+                                                                fit: BoxFit
+                                                                    .cover,
+                                                              )),
                                                 )
                                               : Column(
                                                   mainAxisAlignment:

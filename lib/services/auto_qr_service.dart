@@ -57,10 +57,11 @@ class AutoQrService {
   }
 
   void toggle() {
-    if (_isActive)
+    if (_isActive) {
       stop();
-    else
+    } else {
       start();
+    }
   }
 
   // --- INTERNAL LOGIC (SAMA PERSIS DENGAN V3.2) ---
@@ -141,8 +142,9 @@ class AutoQrService {
     try {
       if (room.orgDaerahId == null &&
           room.orgDesaId == null &&
-          room.orgKelompokId == null)
+          room.orgKelompokId == null) {
         return;
+      }
 
       // 1. CEK PRESENSI (Blacklist)
       final presensiResponse = await _supabase
@@ -168,7 +170,6 @@ class AutoQrService {
 
       dynamic baseQuery = _supabase.from('users').select();
 
-      int processedCount = 0;
       int actionCount = 0;
       int pageSize = 50;
       bool keepScanning = true;
@@ -187,7 +188,6 @@ class AutoQrService {
         }
 
         for (var u in batch) {
-          processedCount++;
           final uid = u['id'].toString();
           final uName = u['nama'] ?? 'No Name';
 
@@ -255,15 +255,18 @@ class AutoQrService {
             final y = int.parse(parts[2]);
             dob = DateTime(y, m, d);
           }
-        } catch (e) {}
+        } catch (e) {
+          // Silently ignore parse errors
+        }
       }
 
       if (dob != null) {
         final now = DateTime.now();
         int age = now.year - dob.year;
         if (now.month < dob.month ||
-            (now.month == dob.month && now.day < dob.day))
+            (now.month == dob.month && now.day < dob.day)) {
           age--;
+        }
 
         if (age >= 40) return 'orangtua';
         if (age >= 17) return 'mudamudi';
@@ -341,6 +344,8 @@ class AutoQrService {
           .update({'qr_code': uniqueCode})
           .match({'pengajian_id': room.id, 'user_id': userId});
       _log("   🛠️ Repaired QR for $userName ($uniqueCode)");
-    } catch (e) {}
+    } catch (e) {
+      // Silently ignore repair errors
+    }
   }
 }

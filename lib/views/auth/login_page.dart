@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hpdaerah/services/auth_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:hpdaerah/views/auth/google_auth_btn.dart'; // Import the new Unified Button
 import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
 import 'package:hpdaerah/views/auth/register_page.dart';
 import 'package:hpdaerah/views/landing_page.dart';
@@ -112,6 +114,83 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         }
+      }
+    }
+  }
+
+  // Handles the authenticated Google user
+  Future<void> _handleGoogleLoginSuccess(
+    GoogleSignInAccount googleAccount,
+  ) async {
+    setState(() => _isLoading = true);
+    try {
+      final authService = AuthService();
+      // Cek apakah email terdaftar di database kita
+      final user = await authService.getUserByEmail(googleAccount.email);
+
+      if (!mounted) return;
+
+      if (user != null) {
+        // Login Success
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('logged_in_username', user.username);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selamat datang kembali, ${user.nama}'),
+            backgroundColor: const Color(0xFF1A5F2D),
+          ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => DashboardPage(user: user)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Akun Google ini belum terdaftar. Silakan daftar terlebih dahulu.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal login Google: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Mobile trigger
+  void _loginGoogleMobile() async {
+    setState(() => _isLoading = true);
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+      // authenticate() is safe here because this method is only called by GoogleAuthButtonMobile
+      // or if platform check passes. But GoogleAuthButton handles platform check.
+      // However, if we use the stub/conditional import, we know this is mobile path
+      final googleAccount = await googleSignIn.authenticate();
+      if (!mounted) return;
+      await _handleGoogleLoginSuccess(googleAccount);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal login Google: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -487,6 +566,53 @@ class _LoginPageState extends State<LoginPage> {
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Divider(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    child: Text(
+                                      "ATAU",
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Divider(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                // Use GoogleAuthButton to handle both Web (renderButton) and Mobile
+                                child: GoogleAuthButton(
+                                  isLoading: _isLoading,
+                                  onSignInSuccess: (account) {
+                                    if (account != null) {
+                                      _handleGoogleLoginSuccess(account);
+                                    }
+                                  },
                                 ),
                               ),
                             ],

@@ -49,10 +49,11 @@ class _AturTargetKhatamanPageState extends State<AturTargetKhatamanPage> {
       // Determine org column based on admin level
       String orgColumn = 'org_kelompok_id'; // Default
       final level = widget.user.adminLevel ?? 3;
-      if (level == 1)
+      if (level == 1) {
         orgColumn = 'org_daerah_id';
-      else if (level == 2)
+      } else if (level == 2) {
         orgColumn = 'org_desa_id';
+      }
 
       // Load user list (all users in hierarki)
       final userResponse = await _supabase

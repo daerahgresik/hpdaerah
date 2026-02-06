@@ -45,6 +45,25 @@ class AuthService {
     }
   }
 
+  /// Get user by Email (for Google Auth)
+  Future<UserModel?> getUserByEmail(String email) async {
+    try {
+      final userResponse = await _client
+          .from('users')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+
+      if (userResponse != null) {
+        return UserModel.fromJson(userResponse);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching user by email: $e');
+      return null;
+    }
+  }
+
   /// Sign out
   Future<void> signOut() async {
     // Since we are using custom login (no auth.signIn), we just likely clear local state
