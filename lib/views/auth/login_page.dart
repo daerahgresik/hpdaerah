@@ -7,6 +7,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:hpdaerah/views/auth/google_auth_btn.dart'; // Import the new Unified Button
 import 'package:hpdaerah/views/auth/dashboard/dashboard_page.dart';
 import 'package:hpdaerah/views/auth/register_page.dart';
+import 'package:hpdaerah/views/auth/forgot_password_page.dart';
 import 'package:hpdaerah/views/landing_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -168,30 +169,6 @@ class _LoginPageState extends State<LoginPage> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // Mobile trigger
-  void _loginGoogleMobile() async {
-    setState(() => _isLoading = true);
-    try {
-      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-      // authenticate() is safe here because this method is only called by GoogleAuthButtonMobile
-      // or if platform check passes. But GoogleAuthButton handles platform check.
-      // However, if we use the stub/conditional import, we know this is mobile path
-      final googleAccount = await googleSignIn.authenticate();
-      if (!mounted) return;
-      await _handleGoogleLoginSuccess(googleAccount);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal login Google: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        setState(() => _isLoading = false);
-      }
     }
   }
 
@@ -506,20 +483,11 @@ class _LoginPageState extends State<LoginPage> {
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
                                   onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Lupa Password'),
-                                        content: const Text(
-                                          'Untuk mereset password, silakan hubungi Admin atau Pengurus setempat.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('Tutup'),
-                                          ),
-                                        ],
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ForgotPasswordPage(),
                                       ),
                                     );
                                   },

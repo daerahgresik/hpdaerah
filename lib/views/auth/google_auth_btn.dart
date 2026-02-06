@@ -56,41 +56,42 @@ class _GoogleAuthButtonState extends State<GoogleAuthButton> {
   Future<void> _handleSignIn() async {
     setState(() => _localLoading = true);
 
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      if (mounted) {
+        setState(() => _localLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google Sign-In belum tersedia di Desktop.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
-      // Use singleton instance as standard in v7
-      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+      // v6.x uses standard constructor
+      final GoogleSignIn googleSignIn = GoogleSignIn();
 
-      GoogleSignInAccount? account;
+      // Standard Sign In flow works for both Mobile and Web (Popup) in v6.x
+      // This allows us to use our Custom Button!
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
 
-      // --- LOGIC UTAMA ---
-
-      // Cek apakah platform mendukung authenticate() (Mobile usually true, Web false/limited)
-      final bool canAuth = await googleSignIn.supportsAuthenticate();
-
-      if (canAuth) {
-        // [MOBILE / SUPPORTED]
-        account = await googleSignIn.authenticate();
-      } else {
-        // [WEB / FALLBACK]
-        // Coba login ringan (cookies lama)
-        account = await googleSignIn.attemptLightweightAuthentication();
-
-        if (account == null) {
-          // Jika gagal, user harusnya pakai renderButton.
-          // Tapi karena kita dipaksa 1 file, kita tidak bisa pakai renderButton (package khusus).
-          // Jadi kita fallback ke pesan error informatif.
-          throw 'Fitur Login Otomatis Google Web belum tersedia di mode ini. Silakan isi form manual.';
-        }
+      if (account == null) {
+        return; // User cancelled
       }
 
-      if (account != null && mounted) {
+      if (mounted) {
         widget.onSignInSuccess(account);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$e'),
+            content: Text('Gagal login Google: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),

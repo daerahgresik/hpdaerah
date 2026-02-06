@@ -11,7 +11,7 @@ import 'package:hpdaerah/utils/image_helper.dart';
 class RegisterController {
   final SupabaseClient _client = Supabase.instance.client;
   final OrganizationService _organizationService = OrganizationService();
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // --- HIERARCHY DATA FETCHING ---
 
@@ -43,22 +43,9 @@ class RegisterController {
   // --- GOOGLE SIGN-IN HELPER ---
   Future<GoogleSignInAccount?> signInWithGoogle() async {
     try {
-      // Check if authenticate() is supported on this platform
-      final supportsAuth = await _googleSignIn.supportsAuthenticate();
-
-      if (supportsAuth) {
-        // Mobile platforms - use authenticate()
-        return await _googleSignIn.authenticate();
-      } else {
-        // Web platform - try attemptLightweightAuthentication first
-        // This works if user has previously signed in
-        final account = await _googleSignIn.attemptLightweightAuthentication();
-        if (account != null) {
-          return account;
-        }
-        // For fresh sign-in on web, caller needs to use renderButton widget
-        throw 'Untuk mendaftar dengan Google di Web, gunakan tombol Google Sign-In di bawah.';
-      }
+      // v6.x: Standard signIn works for Web (Popup) and Mobile
+      // No need for supportsAuthenticate checks
+      return await _googleSignIn.signIn();
     } catch (e) {
       throw 'Gagal menghubungkan Google: $e';
     }

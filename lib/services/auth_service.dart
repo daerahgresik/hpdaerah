@@ -64,6 +64,23 @@ class AuthService {
     }
   }
 
+  /// Get admins by organization and level
+  Future<List<UserModel>> getAdminsByOrg(String orgId, int level) async {
+    try {
+      final response = await _client
+          .from('users')
+          .select()
+          .eq('admin_level', level)
+          .eq('admin_org_id', orgId);
+
+      final data = response as List<dynamic>;
+      return data.map((json) => UserModel.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error fetching admins: $e');
+      return [];
+    }
+  }
+
   /// Sign out
   Future<void> signOut() async {
     // Since we are using custom login (no auth.signIn), we just likely clear local state
