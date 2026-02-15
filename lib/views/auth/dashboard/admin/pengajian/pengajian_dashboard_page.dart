@@ -558,6 +558,13 @@ class _PengajianDashboardPageState extends State<PengajianDashboardPage> {
               AturKelasPage(
                 user: widget.user,
                 orgId: _selectedOrgId ?? widget.orgId,
+                onNavigateToKhataman: () {
+                  // Switch to Khataman menu
+                  setState(() {
+                    _showAturKelas = false;
+                    _showKhataman = true;
+                  });
+                },
               ),
             ],
 

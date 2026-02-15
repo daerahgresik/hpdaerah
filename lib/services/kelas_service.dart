@@ -66,10 +66,12 @@ class KelasService {
       // 3. Map organization info to classes
       return (response as List).map((e) {
         final kelas = Kelas.fromJson(e);
-        final info = kelompokInfos.firstWhere(
-          (k) => k['id'] == kelas.orgKelompokId,
-          orElse: () => {},
-        );
+        final info = kelas.orgKelompokId != null
+            ? kelompokInfos.firstWhere(
+                (k) => k['id'] == kelas.orgKelompokId,
+                orElse: () => {},
+              )
+            : <String, dynamic>{};
 
         String displayName = info['name'] ?? '';
         if (info['desa_name'] != null) {
@@ -153,7 +155,7 @@ class KelasService {
     try {
       await _client
           .from('kelas')
-          .update({'nama': kelas.nama, 'deskripsi': kelas.deskripsi})
+          .update({'nama': kelas.nama})
           .eq('id', kelas.id);
     } catch (e) {
       debugPrint("Error updateKelas: $e");
@@ -308,15 +310,17 @@ class KelasService {
 
       for (final kelas in kelasList) {
         final normalized = ClassNameHelper.normalize(kelas.nama);
-        final kelompokInfo = kelompokInfos.firstWhere(
-          (k) => k['id'] == kelas.orgKelompokId,
-          orElse: () => {'id': kelas.orgKelompokId, 'name': 'Unknown'},
-        );
+        final kelompokInfo = kelas.orgKelompokId != null
+            ? kelompokInfos.firstWhere(
+                (k) => k['id'] == kelas.orgKelompokId,
+                orElse: () => {'id': kelas.orgKelompokId, 'name': 'Unknown'},
+              )
+            : <String, dynamic>{'id': '', 'name': 'Kelas Khusus'};
 
         final breakdown = KelasBreakdown(
           kelasId: kelas.id,
           kelasName: kelas.nama,
-          kelompokId: kelas.orgKelompokId,
+          kelompokId: kelas.orgKelompokId ?? '',
           kelompokName: kelompokInfo['name'] as String? ?? 'Unknown',
           desaId: kelompokInfo['desa_id'] as String?,
           desaName: kelompokInfo['desa_name'] as String?,
@@ -614,7 +618,92 @@ class KelasService {
     }
   }
 
-  // ==================== ROOM TARGET METHODS ====================
+  // ==================== SUB-KELAS & KELAS KHUSUS ====================
+
+  /// Fetch sub-kelas (children) dari kelas induk
+  Future<List<Kelas>> fetchSubKelas(String parentKelasId) async {
+    try {
+      final response = await _client
+          .from('kelas')
+          .select()
+          .eq('parent_kelas_id', parentKelasId)
+          .order('nama', ascending: true);
+
+      return (response as List).map((e) => Kelas.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint("Error fetchSubKelas: $e");
+      return [];
+    }
+  }
+
+  /// Fetch kelas berdasarkan org_id dan org_level
+  /// Untuk kelas khusus tingkat Daerah/Desa
+  Future<List<Kelas>> fetchKelasByOrgLevel({
+    required String orgId,
+    required int orgLevel,
+  }) async {
+    try {
+      final response = await _client
+          .from('kelas')
+          .select()
+          .eq('org_id', orgId)
+          .eq('org_level', orgLevel)
+          .filter('parent_kelas_id', 'is', 'null')
+          .order('nama', ascending: true);
+
+      return (response as List).map((e) => Kelas.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint("Error fetchKelasByOrgLevel: $e");
+      return [];
+    }
+  }
+
+  /// Cek apakah kelas punya sub-kelas (children)
+  Future<bool> hasSubKelas(String kelasId) async {
+    try {
+      final response = await _client
+          .from('kelas')
+          .select('id')
+          .eq('parent_kelas_id', kelasId)
+          .limit(1);
+      return (response as List).isNotEmpty;
+    } catch (e) {
+      debugPrint("Error hasSubKelas: $e");
+      return false;
+    }
+  }
+
+  /// Fetch kelas dengan info sub-kelas untuk dropdown registrasi
+  /// Jika kelas punya children, user harus pilih sub-kelas
+  Future<List<Kelas>> fetchKelasForRegistration(String kelompokId) async {
+    try {
+      // Ambil semua kelas utama (parent) di kelompok ini
+      final response = await _client
+          .from('kelas')
+          .select()
+          .eq('org_kelompok_id', kelompokId)
+          .filter('parent_kelas_id', 'is', 'null')
+          .order('nama', ascending: true);
+
+      final parentKelas = (response as List)
+          .map((e) => Kelas.fromJson(e))
+          .toList();
+
+      // Cek mana yang punya sub-kelas
+      final result = <Kelas>[];
+      for (final kelas in parentKelas) {
+        final children = await fetchSubKelas(kelas.id);
+        result.add(kelas.copyWith(hasChildren: children.isNotEmpty));
+      }
+
+      return result;
+    } catch (e) {
+      debugPrint("Error fetchKelasForRegistration: $e");
+      return [];
+    }
+  }
+
+  // ==================== ROOM TARGET METHODS ==
 
   /// Get kelas list with member counts for room target selector
   /// Returns list of kelas with name, id, and memberCount

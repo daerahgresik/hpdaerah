@@ -43,7 +43,7 @@ class KelasBreakdown {
     return KelasBreakdown(
       kelasId: kelas.id,
       kelasName: kelas.nama,
-      kelompokId: kelas.orgKelompokId,
+      kelompokId: kelas.orgKelompokId ?? '',
       kelompokName: kelompokName,
       desaId: desaId,
       desaName: desaName,

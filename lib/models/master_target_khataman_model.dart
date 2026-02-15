@@ -79,6 +79,16 @@ class MasterTargetKhataman {
   }
 
   @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MasterTargetKhataman &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
   String toString() =>
       'MasterTargetKhataman(id: $id, nama: $nama, halaman: $jumlahHalaman)';
 }

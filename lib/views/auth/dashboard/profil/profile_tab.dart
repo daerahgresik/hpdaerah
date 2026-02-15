@@ -1132,13 +1132,22 @@ class _ProfileTabState extends State<ProfileTab> {
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              const Text(
-                                                'Terhubung dengan Google',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                  color: Colors.green,
-                                                ),
+                                              Row(
+                                                children: [
+                                                  const Text(
+                                                    'Terhubung dengan ',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14,
+                                                      color: Colors.green,
+                                                    ),
+                                                  ),
+                                                  Image.asset(
+                                                    'assets/images/google_text_logo.png',
+                                                    height: 16,
+                                                  ),
+                                                ],
                                               ),
                                               Text(
                                                 _currentUser.email!,

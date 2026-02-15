@@ -7,13 +7,21 @@ import 'package:hpdaerah/services/kelas_service.dart';
 import 'package:hpdaerah/services/organization_service.dart';
 
 /// View Mode untuk admin level tinggi
-enum ViewMode { overview, specific }
+enum ViewMode { daerah, desa, kelompok }
+
+enum OverviewType { byRegion, byClass }
 
 class AturKelasPage extends StatefulWidget {
   final UserModel user;
   final String orgId;
+  final VoidCallback? onNavigateToKhataman;
 
-  const AturKelasPage({super.key, required this.user, required this.orgId});
+  const AturKelasPage({
+    super.key,
+    required this.user,
+    required this.orgId,
+    this.onNavigateToKhataman,
+  });
 
   @override
   State<AturKelasPage> createState() => _AturKelasPageState();
@@ -28,15 +36,15 @@ class _AturKelasPageState extends State<AturKelasPage> {
   int get _adminLevel => widget.user.adminLevel ?? 4;
 
   // State - View Mode (for admin level <= 2)
-  ViewMode _viewMode = ViewMode.overview;
+  ViewMode _viewMode = ViewMode.daerah;
 
   // State - Overview Mode
+  OverviewType _overviewType = OverviewType.byRegion;
   List<AggregatedKelas> _aggregatedKelas = [];
   HierarchyStats _stats = HierarchyStats.empty();
   List<Map<String, dynamic>> _desaFilter = [];
   List<Map<String, dynamic>> _kelompokFilter = [];
   String? _filterDesaId;
-  final Set<String> _expandedCards = {};
 
   // State - Specific Mode (per kelompok)
   List<Kelas> _kelasList = [];
@@ -161,9 +169,10 @@ class _AturKelasPageState extends State<AturKelasPage> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  void _switchToOverview() async {
+  void _switchToDaerah() async {
     setState(() {
-      _viewMode = ViewMode.overview;
+      _viewMode = ViewMode.daerah;
+      _filterDesaId = null;
       _isLoading = true;
     });
 
@@ -171,9 +180,20 @@ class _AturKelasPageState extends State<AturKelasPage> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  void _switchToSpecific() async {
+  void _switchToDesa(String? desaId) async {
     setState(() {
-      _viewMode = ViewMode.specific;
+      _viewMode = ViewMode.desa;
+      _filterDesaId = desaId;
+      _isLoading = true;
+    });
+
+    await _loadOverviewData();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  void _switchToKelompok() async {
+    setState(() {
+      _viewMode = ViewMode.kelompok;
       _isLoading = true;
     });
 
@@ -205,10 +225,10 @@ class _AturKelasPageState extends State<AturKelasPage> {
           )
         else if (_adminLevel == 3)
           _buildSpecificContent()
-        else if (_viewMode == ViewMode.overview)
-          _buildOverviewContent()
+        else if (_viewMode == ViewMode.kelompok)
+          _buildSpecificContent()
         else
-          _buildSpecificContent(),
+          _buildOverviewContent(),
       ],
     );
   }
@@ -247,7 +267,7 @@ class _AturKelasPageState extends State<AturKelasPage> {
           ),
         ),
         // Tombol tambah kelas
-        if (_viewMode == ViewMode.specific && _selectedKelompokId != null)
+        if (_viewMode == ViewMode.kelompok && _selectedKelompokId != null)
           ElevatedButton.icon(
             onPressed: () => _showAddEditDialog(),
             icon: const Icon(Icons.add, size: 18),
@@ -261,21 +281,15 @@ class _AturKelasPageState extends State<AturKelasPage> {
               ),
             ),
           )
-        else if (_viewMode == ViewMode.overview && _adminLevel <= 2)
+        else if (_viewMode != ViewMode.kelompok && _adminLevel <= 2)
           _buildOverviewAddButton(),
       ],
     );
   }
 
   Widget _buildOverviewAddButton() {
-    return PopupMenuButton<String>(
-      onSelected: (kelompokId) {
-        setState(() {
-          _selectedKelompokId = kelompokId;
-          _viewMode = ViewMode.specific;
-        });
-        _loadKelas().then((_) => _showAddEditDialog());
-      },
+    return GestureDetector(
+      onTap: () => _showAddEditDialog(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
@@ -288,7 +302,7 @@ class _AturKelasPageState extends State<AturKelasPage> {
             Icon(Icons.add, size: 18, color: Colors.white),
             SizedBox(width: 6),
             Text(
-              "Tambah",
+              "Tambah Kelas",
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
@@ -297,14 +311,6 @@ class _AturKelasPageState extends State<AturKelasPage> {
           ],
         ),
       ),
-      itemBuilder: (context) {
-        return _kelompokFilter.map((k) {
-          return PopupMenuItem<String>(
-            value: k['id'] as String,
-            child: Text(k['name'] as String),
-          );
-        }).toList();
-      },
     );
   }
 
@@ -317,20 +323,31 @@ class _AturKelasPageState extends State<AturKelasPage> {
       ),
       child: Row(
         children: [
+          // Tab Daerah (Overview)
           Expanded(
             child: _ModeToggleButton(
-              label: "Overview",
-              icon: Icons.dashboard_rounded,
-              isSelected: _viewMode == ViewMode.overview,
-              onTap: _switchToOverview,
+              label: "Daerah",
+              icon: Icons.domain_rounded,
+              isSelected: _viewMode == ViewMode.daerah,
+              onTap: _switchToDaerah,
             ),
           ),
+          // Tab Desa
           Expanded(
             child: _ModeToggleButton(
-              label: "Per Kelompok",
-              icon: Icons.list_alt_rounded,
-              isSelected: _viewMode == ViewMode.specific,
-              onTap: _switchToSpecific,
+              label: "Desa",
+              icon: Icons.location_city_rounded,
+              isSelected: _viewMode == ViewMode.desa,
+              onTap: () => _switchToDesa(null),
+            ),
+          ),
+          // Tab Kelompok
+          Expanded(
+            child: _ModeToggleButton(
+              label: "Kelompok",
+              icon: Icons.groups_rounded,
+              isSelected: _viewMode == ViewMode.kelompok,
+              onTap: _switchToKelompok,
             ),
           ),
         ],
@@ -338,27 +355,74 @@ class _AturKelasPageState extends State<AturKelasPage> {
     );
   }
 
-  // ==================== OVERVIEW MODE CONTENT ====================
+  // ==================== DAERAH & DESA CONTENT ====================
 
   Widget _buildOverviewContent() {
+    if (_viewMode == ViewMode.daerah) {
+      return _buildDaerahContent();
+    } else {
+      return _buildDesaContent();
+    }
+  }
+
+  Widget _buildDaerahContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Stats Header
+        _buildStatsHeader(),
+        const SizedBox(height: 12),
+        _buildOverviewTypeToggle(),
+        const SizedBox(height: 16),
+        if (_overviewType == OverviewType.byRegion)
+          _buildHierarchyTree(filterDesaId: null)
+        else
+          _buildAggregatedByClassList(filterDesaId: null),
+      ],
+    );
+  }
+
+  Widget _buildDesaContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         _buildStatsHeader(),
         const SizedBox(height: 16),
 
-        // Filters
+        // Info Context Region
         if (_adminLevel == 1) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.1)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Menampilkan kelas di desa dari Daerah ${widget.user.orgDaerahName ?? '-'}",
+                    style: const TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
+                ),
+              ],
+            ),
+          ),
           _buildDesaFilter(),
           const SizedBox(height: 12),
         ],
 
-        // Aggregated Kelas List
-        if (_aggregatedKelas.isEmpty)
-          _buildEmptyState("Belum ada kelas di wilayah ini")
+        _buildOverviewTypeToggle(),
+        const SizedBox(height: 12),
+
+        if (_overviewType == OverviewType.byRegion)
+          _buildHierarchyTree(filterDesaId: _filterDesaId)
         else
-          ..._aggregatedKelas.map((ak) => _buildAggregatedCard(ak)),
+          _buildAggregatedByClassList(filterDesaId: _filterDesaId),
 
         // Unassigned warning
         if (_stats.unassignedCount > 0) ...[
@@ -366,6 +430,367 @@ class _AturKelasPageState extends State<AturKelasPage> {
           _buildUnassignedOverviewBanner(),
         ],
       ],
+    );
+  }
+
+  /// Builds a hierarchy tree: Desa -> Kelompok -> Kelas
+  Widget _buildHierarchyTree({String? filterDesaId}) {
+    // 1. Determine list of Desa to show
+    List<Map<String, dynamic>> desasToShow = [];
+    if (filterDesaId != null) {
+      desasToShow = _desaFilter.where((d) => d['id'] == filterDesaId).toList();
+    } else {
+      // Show all desa if no filter
+      desasToShow = List.from(_desaFilter);
+      // If admin level is not 1, we might need to rely on what's available or user's org
+      if (_adminLevel == 2 && _desaFilter.isEmpty) {
+        // Fallback for Admin Desa if _desaFilter is empty
+        desasToShow = [
+          {'id': widget.user.orgDesaId, 'name': widget.user.orgDesaName},
+        ];
+      }
+    }
+
+    if (desasToShow.isEmpty) {
+      if (_isLoading) return const Center(child: CircularProgressIndicator());
+      return _buildEmptyState("Data desa tidak ditemukan");
+    }
+
+    return Column(
+      children: desasToShow.map((desa) {
+        return _buildDesaExpansionTile(desa);
+      }).toList(),
+    );
+  }
+
+  Widget _buildDesaExpansionTile(Map<String, dynamic> desa) {
+    // 2. Find all classes in this Desa
+    final desaId = desa['id'];
+    final desaName = desa['name'];
+
+    // Group classes by Kelompok
+    final Map<String, List<KelasBreakdown>> kelompokMap = {};
+    int totalKelasInDesa = 0;
+    int totalKelompokInDesa = 0;
+
+    for (var agg in _aggregatedKelas) {
+      for (var bd in agg.breakdown) {
+        if (bd.desaId == desaId) {
+          final kId = bd.kelompokId;
+          final kName = bd.kelompokName;
+
+          final key = "$kId|$kName";
+
+          if (!kelompokMap.containsKey(key)) {
+            kelompokMap[key] = [];
+            totalKelompokInDesa++;
+          }
+          kelompokMap[key]!.add(bd);
+          totalKelasInDesa++;
+        }
+      }
+    }
+
+    // Sort Kelompok by Name
+    final sortedKelompokKeys = kelompokMap.keys.toList()
+      ..sort((a, b) {
+        final nameA = a.split('|')[1];
+        final nameB = b.split('|')[1];
+        return nameA.compareTo(nameB);
+      });
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: ExpansionTile(
+        initiallyExpanded: _filterDesaId == desaId, // Expand if filtered
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.teal.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.location_city, color: Colors.teal),
+        ),
+        title: Text(
+          desaName,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        subtitle: Text(
+          "$totalKelompokInDesa Kelompok • $totalKelasInDesa Kelas",
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+        children: [
+          if (sortedKelompokKeys.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                "Belum ada data kelas di desa ini.",
+                style: TextStyle(
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey,
+                ),
+              ),
+            )
+          else
+            ...sortedKelompokKeys.map((key) {
+              final parts = key.split('|');
+              final kId = parts[0];
+              final kName = parts[1];
+              final kelasList = kelompokMap[key]!;
+
+              // Sort kelas by name
+              kelasList.sort((a, b) => a.kelasName.compareTo(b.kelasName));
+
+              return _buildKelompokExpansionTile(kId, kName, kelasList);
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKelompokExpansionTile(
+    String kId,
+    String kName,
+    List<KelasBreakdown> kelasList,
+  ) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: true, // Auto expand kelompok inside desa
+        leading: const Icon(
+          Icons.groups_outlined,
+          size: 20,
+          color: Colors.grey,
+        ),
+        title: Text(
+          kName,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        subtitle: Text("${kelasList.length} Kelas"),
+        childrenPadding: const EdgeInsets.only(left: 16, bottom: 8),
+        children: kelasList.map((bd) {
+          return ListTile(
+            contentPadding: const EdgeInsets.only(left: 40, right: 16),
+            dense: true,
+            leading: const Icon(
+              Icons.class_outlined,
+              size: 18,
+              color: Colors.teal,
+            ),
+            title: Text(bd.kelasName, style: const TextStyle(fontSize: 14)),
+            subtitle: Text("${bd.memberCount} Anggota"),
+            onTap: () {
+              // Optional: Show details
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ==================== TOGGLE & AGGREGATED VIEW ====================
+
+  Widget _buildOverviewTypeToggle() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () =>
+                  setState(() => _overviewType = OverviewType.byRegion),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _overviewType == OverviewType.byRegion
+                      ? Colors.teal
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.account_tree_rounded,
+                      size: 16,
+                      color: _overviewType == OverviewType.byRegion
+                          ? Colors.white
+                          : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Per Wilayah",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _overviewType == OverviewType.byRegion
+                            ? Colors.white
+                            : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _overviewType = OverviewType.byClass),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _overviewType == OverviewType.byClass
+                      ? Colors.teal
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.school_rounded,
+                      size: 16,
+                      color: _overviewType == OverviewType.byClass
+                          ? Colors.white
+                          : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Per Kelas",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _overviewType == OverviewType.byClass
+                            ? Colors.white
+                            : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAggregatedByClassList({String? filterDesaId}) {
+    // Filter berdasarkan desa jika ada
+    List<AggregatedKelas> filtered = _aggregatedKelas;
+    if (filterDesaId != null) {
+      filtered = _aggregatedKelas.where((agg) {
+        return agg.breakdown.any((bd) => bd.desaId == filterDesaId);
+      }).toList();
+    }
+
+    if (filtered.isEmpty) {
+      return _buildEmptyState("Belum ada data kelas");
+    }
+
+    // Sort berdasarkan nama
+    filtered.sort(
+      (a, b) => ClassNameHelper.naturalCompare(a.displayName, b.displayName),
+    );
+
+    return Column(
+      children: filtered.map((agg) {
+        return _buildAggregatedClassCard(agg, filterDesaId: filterDesaId);
+      }).toList(),
+    );
+  }
+
+  Widget _buildAggregatedClassCard(
+    AggregatedKelas agg, {
+    String? filterDesaId,
+  }) {
+    // Filter breakdown berdasarkan desa jika perlu
+    final breakdowns = filterDesaId != null
+        ? agg.breakdown.where((bd) => bd.desaId == filterDesaId).toList()
+        : agg.breakdown;
+
+    final totalMembers = breakdowns.fold<int>(
+      0,
+      (sum, bd) => sum + bd.memberCount,
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: ExpansionTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.indigo.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.class_rounded,
+            color: Colors.indigo,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          agg.displayName,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        subtitle: Text(
+          "$totalMembers Anggota • ${breakdowns.length} Kelompok",
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+        childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+        children: breakdowns.map((bd) {
+          return ListTile(
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+            leading: const Icon(
+              Icons.groups_outlined,
+              size: 18,
+              color: Colors.grey,
+            ),
+            title: Text(bd.kelompokName, style: const TextStyle(fontSize: 13)),
+            subtitle: bd.desaName != null
+                ? Text(
+                    bd.desaName!,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  )
+                : null,
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.teal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                "${bd.memberCount}",
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -384,6 +809,28 @@ class _AturKelasPageState extends State<AturKelasPage> {
       parts.add("${_stats.totalMembers} anggota");
     }
 
+    // Determine header title based on admin level & view mode
+    String headerTitle = "Ringkasan Kelas";
+    if (_adminLevel == 1) {
+      if (_viewMode == ViewMode.daerah) {
+        headerTitle = "Ringkasan Daerah ${widget.user.orgDaerahName ?? ''}";
+      } else if (_viewMode == ViewMode.desa) {
+        if (_filterDesaId != null) {
+          final desaName = _desaFilter.firstWhere(
+            (d) => d['id'] == _filterDesaId,
+            orElse: () => {'name': ''},
+          )['name'];
+          headerTitle = "Ringkasan Desa $desaName";
+        } else {
+          headerTitle = "Ringkasan Semua Desa";
+        }
+      } else {
+        headerTitle = "Ringkasan Kelompok";
+      }
+    } else if (_adminLevel == 2) {
+      headerTitle = "Ringkasan Desa ${widget.user.orgDesaName ?? ''}";
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -392,40 +839,106 @@ class _AturKelasPageState extends State<AturKelasPage> {
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.analytics, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Ringkasan Kelas",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  parts.join(" • "),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
+                child: Icon(
+                  _viewMode == ViewMode.daerah ? Icons.domain : Icons.analytics,
+                  color: Colors.white,
+                  size: 24,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      headerTitle,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      parts.join(" • "),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          // Quick action: Atur Target button
+          if (_stats.uniqueClassCount > 0) ...[
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () {
+                // Navigate to Khataman tab which contains Atur Target
+                if (widget.onNavigateToKhataman != null) {
+                  widget.onNavigateToKhataman!();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Buka menu Khataman → Atur Target untuk assign target ke kelas',
+                      ),
+                      backgroundColor: Colors.teal,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.track_changes,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Atur Target Khataman',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -437,10 +950,10 @@ class _AturKelasPageState extends State<AturKelasPage> {
       runSpacing: 8,
       children: [
         FilterChip(
-          label: const Text("Semua Desa"),
+          label: const Text("Semua"),
           selected: _filterDesaId == null,
           onSelected: (_) => _onDesaFilterChanged(null),
-          selectedColor: Colors.teal.withValues(alpha: 0.2),
+          selectedColor: Colors.teal.withOpacity(0.2),
           checkmarkColor: Colors.teal,
         ),
         ..._desaFilter.map((desa) {
@@ -449,252 +962,11 @@ class _AturKelasPageState extends State<AturKelasPage> {
             label: Text(desa['name'] as String),
             selected: isSelected,
             onSelected: (_) => _onDesaFilterChanged(desa['id'] as String),
-            selectedColor: Colors.teal.withValues(alpha: 0.2),
+            selectedColor: Colors.teal.withOpacity(0.2),
             checkmarkColor: Colors.teal,
           );
         }),
       ],
-    );
-  }
-
-  Widget _buildAggregatedCard(AggregatedKelas ak) {
-    final isExpanded = _expandedCards.contains(ak.normalizedName);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: [
-          // Header - Tap to expand
-          InkWell(
-            onTap: () {
-              setState(() {
-                if (isExpanded) {
-                  _expandedCards.remove(ak.normalizedName);
-                } else {
-                  _expandedCards.add(ak.normalizedName);
-                }
-              });
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.teal.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.groups_rounded, color: Colors.teal),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ak.displayName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            _StatBadge(
-                              icon: Icons.people,
-                              label: "${ak.totalMembers} anggota",
-                              color: Colors.blue,
-                            ),
-                            const SizedBox(width: 8),
-                            if (ak.kelompokCount > 1)
-                              _StatBadge(
-                                icon: Icons.location_on,
-                                label: "${ak.kelompokCount} kelompok",
-                                color: Colors.orange,
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.expand_more, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Breakdown items
-          if (isExpanded) ...[
-            const Divider(height: 1),
-            ...ak.breakdown.map((b) => _buildBreakdownItem(b)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBreakdownItem(KelasBreakdown breakdown) {
-    return InkWell(
-      onTap: () {
-        // Navigate to specific kelompok view
-        setState(() {
-          _selectedKelompokId = breakdown.kelompokId;
-          _viewMode = ViewMode.specific;
-        });
-        _loadKelas();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            const SizedBox(width: 24),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: Colors.teal.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    breakdown.kelompokName,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  if (breakdown.desaName != null)
-                    Text(
-                      breakdown.desaName!,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                "${breakdown.memberCount} anggota",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.blue[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onSelected: (action) async {
-                if (action == 'edit') {
-                  // Load kelas then show edit dialog
-                  final kelas = await _kelasService.fetchKelasByKelompok(
-                    breakdown.kelompokId,
-                  );
-                  final target = kelas.firstWhere(
-                    (k) => k.id == breakdown.kelasId,
-                    orElse: () => kelas.first,
-                  );
-                  _selectedKelompokId = breakdown.kelompokId;
-                  await _loadKelas();
-                  if (mounted) _showAddEditDialog(kelas: target);
-                } else if (action == 'delete') {
-                  _confirmDeleteFromBreakdown(breakdown);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Hapus', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _confirmDeleteFromBreakdown(KelasBreakdown breakdown) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Hapus Kelas?"),
-        content: Text(
-          "Yakin ingin menghapus kelas \"${breakdown.kelasName}\" "
-          "dari ${breakdown.kelompokName}?\n\n"
-          "Anggota kelas ini akan menjadi tidak memiliki kelas.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _kelasService.deleteKelas(breakdown.kelasId);
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                  await _loadOverviewData();
-                  setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Kelas berhasil dihapus"),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Error: $e"),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text("Hapus"),
-          ),
-        ],
-      ),
     );
   }
 
@@ -741,7 +1013,7 @@ class _AturKelasPageState extends State<AturKelasPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Scope selectors untuk admin daerah/desa
-        if (_adminLevel <= 2 && _viewMode == ViewMode.specific) ...[
+        if (_adminLevel <= 2 && _viewMode == ViewMode.kelompok) ...[
           _buildScopeSelectors(),
           const SizedBox(height: 16),
         ],
@@ -877,22 +1149,42 @@ class _AturKelasPageState extends State<AturKelasPage> {
   }
 
   Widget _buildKelasList() {
+    // Pisahkan kelas utama (tanpa parent) dan sub-kelas
+    final parentKelasList = _kelasList
+        .where((k) => k.parentKelasId == null)
+        .toList();
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _kelasList.length,
+      itemCount: parentKelasList.length,
       itemBuilder: (context, index) {
-        final kelas = _kelasList[index];
-        final count = _memberCounts[kelas.id] ?? 0;
+        final kelas = parentKelasList[index];
+        return _buildKelasCard(kelas);
+      },
+    );
+  }
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: InkWell(
-            onTap: () => _showKelasDetail(kelas),
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildKelasCard(Kelas kelas) {
+    final count = _memberCounts[kelas.id] ?? 0;
+    // Cari sub-kelas dari daftar yg sudah dimuat
+    final subKelas = _kelasList
+        .where((k) => k.parentKelasId == kelas.id)
+        .toList();
+    final hasSubKelas = subKelas.isNotEmpty;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              _showAddEditDialog(kelas: kelas);
+            },
+            borderRadius: hasSubKelas
+                ? const BorderRadius.vertical(top: Radius.circular(12))
+                : BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -901,38 +1193,97 @@ class _AturKelasPageState extends State<AturKelasPage> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: Colors.teal.withValues(alpha: 0.1),
+                      color: kelas.isKelasKhusus
+                          ? Colors.amber.withOpacity(0.1)
+                          : Colors.teal.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.groups_rounded, color: Colors.teal),
+                    child: Icon(
+                      kelas.isKelasKhusus
+                          ? Icons.star_outline
+                          : Icons.class_outlined,
+                      color: kelas.isKelasKhusus ? Colors.amber : Colors.teal,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          kelas.nama,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        if (kelas.deskripsi?.isNotEmpty == true)
-                          Text(
-                            kelas.deskripsi!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                kelas.nama,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            if (kelas.isKelasKhusus) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  kelas.orgLevelLabel,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         const SizedBox(height: 4),
-                        _StatBadge(
-                          icon: Icons.people,
-                          label: "$count anggota",
-                          color: Colors.blue,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                "$count anggota",
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                            if (hasSubKelas) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  "${subKelas.length} sub-kelas",
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.indigo,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
@@ -942,8 +1293,11 @@ class _AturKelasPageState extends State<AturKelasPage> {
                     onSelected: (action) {
                       if (action == 'edit') {
                         _showAddEditDialog(kelas: kelas);
-                      } else if (action == 'delete') {
-                        _confirmDelete(kelas);
+                      } else if (action == 'add_sub') {
+                        _showAddEditDialog(
+                          parentKelasId: kelas.id,
+                          parentKelasName: kelas.nama,
+                        );
                       }
                     },
                     itemBuilder: (context) => [
@@ -958,12 +1312,12 @@ class _AturKelasPageState extends State<AturKelasPage> {
                         ),
                       ),
                       const PopupMenuItem(
-                        value: 'delete',
+                        value: 'add_sub',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            Icon(Icons.subdirectory_arrow_right, size: 18),
                             SizedBox(width: 8),
-                            Text('Hapus', style: TextStyle(color: Colors.red)),
+                            Text('Tambah Sub-Kelas'),
                           ],
                         ),
                       ),
@@ -973,293 +1327,499 @@ class _AturKelasPageState extends State<AturKelasPage> {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
 
-  // ==================== DIALOGS ====================
-
-  void _showAddEditDialog({Kelas? kelas}) {
-    final isEdit = kelas != null;
-    final nameController = TextEditingController(text: kelas?.nama ?? '');
-    final descController = TextEditingController(text: kelas?.deskripsi ?? '');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isEdit ? "Edit Kelas" : "Tambah Kelas Baru",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          // Tampilkan sub-kelas jika ada
+          if (hasSubKelas)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12),
                 ),
               ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: "Nama Kelas",
-                  hintText: "Contoh: Muda-Mudi",
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: "Deskripsi (Opsional)",
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Column(
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text("Batal"),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (nameController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Nama kelas wajib diisi"),
-                          ),
-                        );
-                        return;
-                      }
-
-                      try {
-                        if (isEdit) {
-                          await _kelasService.updateKelas(
-                            kelas.copyWith(
-                              nama: nameController.text.trim(),
-                              deskripsi: descController.text.trim(),
-                            ),
-                          );
-                        } else {
-                          await _kelasService.createKelas(
-                            Kelas(
-                              id: '',
-                              orgKelompokId: _selectedKelompokId!,
-                              nama: nameController.text.trim(),
-                              deskripsi: descController.text.trim(),
-                            ),
-                          );
-                        }
-
-                        if (context.mounted) {
-                          Navigator.pop(ctx);
-                          _loadKelas();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                isEdit
-                                    ? "Kelas berhasil diperbarui"
-                                    : "Kelas berhasil ditambahkan",
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Error: $e"),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(isEdit ? "Simpan" : "Tambah"),
-                  ),
+                  const Divider(height: 1),
+                  ...subKelas.map((sub) => _buildSubKelasItem(sub, kelas.nama)),
                 ],
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _confirmDelete(Kelas kelas) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Hapus Kelas?"),
-        content: Text(
-          "Yakin ingin menghapus kelas \"${kelas.nama}\"?\n\n"
-          "Anggota kelas ini akan menjadi tidak memiliki kelas.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Batal"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _kelasService.deleteKelas(kelas.id);
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                  _loadKelas();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Kelas berhasil dihapus"),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Error: $e"),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
             ),
-            child: const Text("Hapus"),
-          ),
         ],
       ),
     );
   }
 
-  void _showKelasDetail(Kelas kelas) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
+  Widget _buildSubKelasItem(Kelas sub, String parentName) {
+    final count = _memberCounts[sub.id] ?? 0;
+    return InkWell(
+      onTap: () => _showAddEditDialog(kelas: sub),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
           children: [
+            const SizedBox(width: 20),
+            Icon(
+              Icons.subdirectory_arrow_right,
+              size: 16,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(width: 8),
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+                color: Colors.indigo.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.class_outlined,
+                size: 16,
+                color: Colors.indigo,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                  Text(
+                    sub.nama,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
-                    child: const Icon(Icons.groups, color: Colors.teal),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          kelas.nama,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (kelas.deskripsi?.isNotEmpty == true)
-                          Text(
-                            kelas.deskripsi!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                      ],
-                    ),
+                  Text(
+                    "$count anggota",
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 24),
-            Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _kelasService.getKelasMembers(kelas.id),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final members = snapshot.data ?? [];
-                  if (members.isEmpty) {
-                    return Center(
-                      child: Text(
-                        "Belum ada anggota",
-                        style: TextStyle(color: Colors.grey[500]),
+            Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Method _buildAggregatedCard removed as it is replaced by Hierarchy Tree logic
+
+  // ==================== DIALOGS ====================
+
+  void _showAddEditDialog({
+    Kelas? kelas,
+    String? parentKelasId,
+    String? parentKelasName,
+  }) {
+    final isEdit = kelas != null;
+    final isSubKelas = parentKelasId != null;
+    final nameController = TextEditingController(text: kelas?.nama ?? '');
+
+    // Untuk kelas khusus - pilih tingkat
+    int selectedOrgLevel = kelas?.orgLevel ?? 3; // Default: Kelompok
+    String? selectedOrgId = kelas?.orgId;
+
+    // Jika dari mode overview (bukan kelompok), default ke orgLevel sesuai viewMode
+    if (!isEdit &&
+        !isSubKelas &&
+        _viewMode != ViewMode.kelompok &&
+        _adminLevel <= 2) {
+      if (_viewMode == ViewMode.daerah && _adminLevel == 1) {
+        selectedOrgLevel = 1; // Daerah
+        selectedOrgId = widget.orgId;
+      } else if (_viewMode == ViewMode.desa) {
+        selectedOrgLevel = 2; // Desa
+        selectedOrgId = _filterDesaId ?? widget.orgId;
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEdit
+                        ? "Edit Kelas"
+                        : isSubKelas
+                        ? "Tambah Sub-Kelas"
+                        : "Tambah Kelas Baru",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  // Info parent kelas jika sub-kelas
+                  if (isSubKelas) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.indigo.withOpacity(0.2),
+                        ),
                       ),
-                    );
-                  }
-                  return ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: members.length,
-                    itemBuilder: (context, index) {
-                      final m = members[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: m['foto_profil'] != null
-                              ? NetworkImage(m['foto_profil'])
-                              : null,
-                          child: m['foto_profil'] == null
-                              ? Text(
-                                  (m['nama'] as String?)?.isNotEmpty == true
-                                      ? m['nama'][0].toUpperCase()
-                                      : '?',
-                                )
-                              : null,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.subdirectory_arrow_right,
+                            size: 18,
+                            color: Colors.indigo,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Sub-kelas dari: $parentKelasName",
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.indigo,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Pilih tingkat — hanya di mode overview & bukan edit/sub-kelas
+                  if (!isEdit &&
+                      !isSubKelas &&
+                      _viewMode != ViewMode.kelompok &&
+                      _adminLevel <= 2) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Tingkat Kelas",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          if (_adminLevel == 1)
+                            Expanded(
+                              child: _buildDialogLevelChip(
+                                label: "Daerah",
+                                icon: Icons.domain,
+                                isSelected: selectedOrgLevel == 1,
+                                onTap: () => setDialogState(() {
+                                  selectedOrgLevel = 1;
+                                  selectedOrgId = widget.orgId;
+                                }),
+                              ),
+                            ),
+                          Expanded(
+                            child: _buildDialogLevelChip(
+                              label: "Desa",
+                              icon: Icons.location_city,
+                              isSelected: selectedOrgLevel == 2,
+                              onTap: () => setDialogState(() {
+                                selectedOrgLevel = 2;
+                                selectedOrgId =
+                                    _filterDesaId ??
+                                    (_adminLevel == 2 ? widget.orgId : null);
+                              }),
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildDialogLevelChip(
+                              label: "Kelompok",
+                              icon: Icons.groups,
+                              isSelected: selectedOrgLevel == 3,
+                              onTap: () => setDialogState(() {
+                                selectedOrgLevel = 3;
+                                selectedOrgId = _selectedKelompokId;
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Dropdown Desa jika level = Desa & admin Daerah
+                    if (selectedOrgLevel == 2 && _adminLevel == 1) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedOrgId,
+                        hint: const Text("Pilih Desa"),
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
-                        title: Text(m['nama'] ?? '-'),
-                        subtitle: Text("@${m['username'] ?? '-'}"),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.swap_horiz),
-                          tooltip: "Pindah Kelas",
-                          onPressed: () =>
-                              _showMoveUserDialog(m['id'], m['nama'], kelas.id),
+                        items: _desaFilter.map((d) {
+                          return DropdownMenuItem(
+                            value: d['id'] as String,
+                            child: Text(d['name'] as String),
+                          );
+                        }).toList(),
+                        onChanged: (val) =>
+                            setDialogState(() => selectedOrgId = val),
+                      ),
+                    ],
+
+                    // Dropdown Kelompok jika level = Kelompok
+                    if (selectedOrgLevel == 3) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedOrgId,
+                        hint: const Text("Pilih Kelompok"),
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
-                      );
-                    },
-                  );
-                },
+                        items: _kelompokFilter.map((k) {
+                          return DropdownMenuItem(
+                            value: k['id'] as String,
+                            child: Text(k['name'] as String),
+                          );
+                        }).toList(),
+                        onChanged: (val) =>
+                            setDialogState(() => selectedOrgId = val),
+                      ),
+                    ],
+
+                    // Info tingkat
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline,
+                            size: 14,
+                            color: Colors.amber,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              selectedOrgLevel == 1
+                                  ? "Kelas ini akan berlaku untuk seluruh Daerah"
+                                  : selectedOrgLevel == 2
+                                  ? "Kelas ini akan berlaku untuk satu Desa"
+                                  : "Kelas biasa di bawah satu Kelompok",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.amber,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: "Nama Kelas",
+                      hintText: isSubKelas
+                          ? "Contoh: PAUD, TK, SD Kelas 1"
+                          : "Contoh: Muda-Mudi",
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text("Batal"),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          if (nameController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Nama kelas wajib diisi"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Validasi orgId untuk kelas khusus
+                          if (!isEdit &&
+                              !isSubKelas &&
+                              selectedOrgLevel < 3 &&
+                              selectedOrgId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Pilih organisasi tujuan"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (!isEdit &&
+                              !isSubKelas &&
+                              selectedOrgLevel == 3 &&
+                              selectedOrgId == null &&
+                              _selectedKelompokId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Pilih kelompok tujuan"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            if (isEdit) {
+                              await _kelasService.updateKelas(
+                                kelas.copyWith(
+                                  nama: nameController.text.trim(),
+                                ),
+                              );
+                            } else {
+                              final kelompokId = selectedOrgLevel == 3
+                                  ? (selectedOrgId ?? _selectedKelompokId)
+                                  : null;
+
+                              await _kelasService.createKelas(
+                                Kelas(
+                                  id: '',
+                                  orgKelompokId: kelompokId,
+                                  nama: nameController.text.trim(),
+                                  orgId: isSubKelas
+                                      ? null
+                                      : (selectedOrgId ?? kelompokId),
+                                  orgLevel: isSubKelas ? 3 : selectedOrgLevel,
+                                  parentKelasId: parentKelasId,
+                                ),
+                              );
+                            }
+
+                            if (context.mounted) {
+                              Navigator.pop(ctx);
+
+                              // Refresh data sesuai konteks
+                              if (_viewMode == ViewMode.kelompok ||
+                                  _adminLevel == 3) {
+                                _loadKelas();
+                              } else {
+                                setState(() => _isLoading = true);
+                                await _loadOverviewData();
+                                if (mounted) setState(() => _isLoading = false);
+                              }
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isEdit
+                                        ? "Kelas berhasil diperbarui"
+                                        : isSubKelas
+                                        ? "Sub-kelas berhasil ditambahkan"
+                                        : "Kelas berhasil ditambahkan",
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Error: $e"),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(isEdit ? "Simpan" : "Tambah"),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogLevelChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.teal : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey[600],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.grey[600],
               ),
             ),
           ],
@@ -1551,44 +2111,6 @@ class _ModeToggleButton extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _StatBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _StatBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }

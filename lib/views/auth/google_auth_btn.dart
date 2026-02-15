@@ -2,6 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart'; // Untuk kIsWeb
 
+/// Official Google Logo Widget using local asset
+class GoogleLogo extends StatelessWidget {
+  final double size;
+
+  const GoogleLogo({super.key, this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/images/google_logo.png',
+      width: size,
+      height: size,
+      errorBuilder: (context, error, stackTrace) {
+        // Fallback: colored G text if asset fails to load
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFF4285F4), width: 2),
+          ),
+          child: Center(
+            child: Text(
+              'G',
+              style: TextStyle(
+                color: const Color(0xFF4285F4),
+                fontSize: size * 0.55,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Single Valid Google Auth Button for All Platforms
 class GoogleAuthButton extends StatefulWidget {
   final Function(GoogleSignInAccount?) onSignInSuccess;
@@ -26,29 +63,44 @@ class _GoogleAuthButtonState extends State<GoogleAuthButton> {
 
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton.icon(
+      child: ElevatedButton(
         onPressed: isBusy ? null : _handleSignIn,
-        icon: isBusy
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.login, color: Colors.deepOrange),
-        label: Text(
-          isBusy ? 'Memproses...' : 'Lanjutkan dengan Google',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          backgroundColor: Colors.black87,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
             side: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
           ),
           elevation: 2,
         ),
+        child: isBusy
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Memproses...',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Lanjutkan dengan ',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Image.asset('assets/images/google_text_logo.png', height: 18),
+                ],
+              ),
       ),
     );
   }
